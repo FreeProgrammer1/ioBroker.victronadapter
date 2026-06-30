@@ -1,94 +1,34 @@
-# ioBroker.VictronAdapter
+# ioBroker.victronadapter
 
-ioBroker adapter for Victron GX / Cerbo GX systems via Modbus TCP.
-
-Repository name: `ioBroker.VictronAdapter`  
-ioBroker adapter ID: `victronadapter`  
-npm package name: `iobroker.victronadapter`
-
-## Important
-
-Version 0.6.1 only adds project metadata and adapter-check support files. The runtime source code was intentionally kept unchanged.
+Adapter for Victron GX and Cerbo GX systems via Modbus TCP.
 
 ## Features
 
-- Reads Victron GX / Cerbo GX data via Modbus TCP
-- Creates dashboard states for grid, PV, battery, AC loads and essential loads
-- Supports automatic discovery using a comma-separated Modbus Unit ID list
-- Optional control states for supported Victron settings
-- Installs one clean Lovelace custom card file and two YAML examples
+- Reads Victron GX and Cerbo GX systems via Modbus TCP
+- Provides dashboard states for grid, PV, battery, AC loads and essential loads
+- Supports controls for selected Victron settings
+- Supports automatic discovery with a comma-separated Modbus Unit ID list
+- Provides a clean Lovelace card with normal and circular energy-flow examples
 
 ## Requirements
 
-- ioBroker js-controller >= 6.0.11
-- Node.js >= 20
-- Victron GX / Cerbo GX with Modbus TCP enabled
+- Node.js 22 or newer
+- ioBroker js-controller 6.0.11 or newer
+- ioBroker Admin 7.6.20 or newer
+- Victron GX or Cerbo GX with Modbus TCP enabled
 - Network access from ioBroker to the GX device
-
-## Installation from local TGZ
-
-```bash
-cd /opt/iobroker
-npm i /path/to/iobroker.victronadapter-0.6.1.tgz
-iobroker upload victronadapter
-iobroker add victronadapter
-```
-
-## Installation from GitHub
-
-```bash
-cd /opt/iobroker
-iobroker url https://github.com/gehteuchnichtsanandroid56/ioBroker.VictronAdapter
-```
-
-Then create or start an instance in ioBroker Admin.
-
-## Lovelace
-
-The adapter writes these files into the configured Lovelace instance, usually:
-
-```text
-/opt/iobroker/iobroker-data/files/lovelace.0/cards/
-```
-
-Files:
-
-```text
-victronadapter-card.js
-victronadapter-flow.yaml
-victronadapter-flow-circle.yaml
-```
-
-Normal card:
-
-```yaml
-type: custom:victronadapter-flow
-title: Energiefluss
-subtitle: Victron Adapter
-show_details: true
-show_debug: true
-```
-
-Circle card:
-
-```yaml
-type: custom:victronadapter-flow-circle
-title: Energiefluss
-subtitle: Victron Adapter
-show_details: true
-transparent_background: true
-show_debug: true
-```
 
 ## Configuration
 
-Main settings:
+Configure the adapter instance in ioBroker Admin.
+
+Important settings:
 
 - GX IP address or hostname
 - Modbus TCP port, normally `502`
 - System Unit ID, normally `100`
 - Poll interval
-- Automatic discovery enabled/disabled
+- Automatic discovery
 - Comma-separated Unit IDs for discovery
 
 Default discovery list:
@@ -99,50 +39,59 @@ Default discovery list:
 
 The configured system Unit ID and control Unit ID are always included automatically.
 
-## Development and checks
+## Lovelace
 
-Run syntax checks:
+The adapter can install these files into the configured Lovelace instance:
+
+```text
+victronadapter-card.js
+victronadapter-flow.yaml
+victronadapter-flow-circle.yaml
+```
+
+Normal card type:
+
+```yaml
+type: custom:victronadapter-flow
+```
+
+Circle card type:
+
+```yaml
+type: custom:victronadapter-flow-circle
+```
+
+The card uses the existing `dashboard.*` adapter states.
+
+## Development
+
+Run local checks:
 
 ```bash
 npm test
 ```
 
-Dry-run package creation:
-
-```bash
-npm run test:package
-```
-
-Run ioBroker adapter check:
+Run the repository checker:
 
 ```bash
 npm run adapter-check
 ```
 
-GitHub Actions also runs the official ioBroker testing action on every push and pull request.
+## Changelog
+
+### 0.6.3
+
+- Fixed repository metadata for ioBroker checks.
+- Added all required admin translations.
+- Converted admin i18n to short format.
+- Added JSONConfig responsive size attributes.
+- Updated README structure.
+- Updated GitHub workflow and Dependabot configuration.
+- Updated Node.js and ioBroker dependency metadata.
+- Kept adapter behavior unchanged.
 
 ## License
 
-MIT
+MIT License
 
-
-## 0.6.2 Lovelace circle view
-
-The circular Lovelace card now has a visibly different layout:
-
-- round nodes for PV, grid, battery, AC loads and essential loads
-- central system hub
-- animated flow dots
-- direction labels such as `PV → Anlage`, `Netz → Anlage`, `Anlage → Netz`, `Anlage → Akku` and `Akku → Anlage`
-- no new adapter states are required; the card only uses existing `dashboard.*` values
-
-Use:
-
-```yaml
-type: custom:victronadapter-flow-circle
-title: Energiefluss
-subtitle: Victron Adapter
-show_details: true
-transparent_background: true
-show_debug: true
-```
+Copyright (c) 2026 FreeProgrammer1

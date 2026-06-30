@@ -1,63 +1,61 @@
 {
   "name": "iobroker.victronadapter",
-  "version": "0.6.2",
-  "description": "ioBroker adapter for Victron GX/Cerbo GX with fixed circular Lovelace energy flow view.",
-  "author": "Geht Euch <gehteuchnichtsanandroid56@gmail.com>",
+  "version": "0.6.3",
+  "description": "ioBroker adapter for Victron GX and Cerbo GX systems via Modbus TCP.",
+  "author": "FreeProgrammer1",
   "license": "MIT",
-  "homepage": "https://github.com/gehteuchnichtsanandroid56/ioBroker.VictronAdapter#readme",
+  "homepage": "https://github.com/FreeProgrammer1/ioBroker.victronadapter#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gehteuchnichtsanandroid56/ioBroker.VictronAdapter.git"
+    "url": "https://github.com/FreeProgrammer1/ioBroker.victronadapter.git"
   },
   "bugs": {
-    "url": "https://github.com/gehteuchnichtsanandroid56/ioBroker.VictronAdapter/issues"
+    "url": "https://github.com/FreeProgrammer1/ioBroker.victronadapter/issues"
   },
   "keywords": [
-    "adapter",
-    "battery",
+    "victron",
     "cerbo",
-    "energy",
-    "ess",
     "gx",
-    "ioBroker",
-    "iobroker",
-    "lovelace",
     "modbus",
     "modbus-tcp",
+    "energy",
+    "ess",
     "pv",
-    "victron",
-    "victronadapter"
+    "battery",
+    "solar"
   ],
   "main": "main.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "start": "node main.js",
     "test": "npm run test:js && npm run test:unit && npm run test:package",
     "test:js": "node --check main.js && node --check lib/modbusClient.js && node --check lib/registerMap.js && node --check lovelace/victronadapter-card.js",
     "test:unit": "node --test test/*.test.js",
-    "test:integration": "node -e \"console.log('No integration tests required for local Modbus adapter metadata check')\"",
     "test:package": "npm pack --dry-run",
-    "adapter-check": "npx --yes @iobroker/repochecker https://github.com/gehteuchnichtsanandroid56/ioBroker.VictronAdapter --local",
-    "check": "npm run test && npm run adapter-check"
+    "lint": "node --check main.js && node --check lib/modbusClient.js && node --check lib/registerMap.js && node --check lovelace/victronadapter-card.js",
+    "adapter-check": "npx --yes @iobroker/repochecker https://github.com/FreeProgrammer1/ioBroker.victronadapter --local"
   },
   "dependencies": {
-    "@iobroker/adapter-core": "^3.3.2"
+    "@iobroker/adapter-core": "^3.4.1"
   },
   "devDependencies": {
-    "@iobroker/repochecker": "^5.19.4",
-    "@iobroker/testing": "^5.2.2"
+    "@iobroker/eslint-config": "^2.0.0",
+    "@iobroker/testing": "^5.2.2",
+    "@tsconfig/node22": "^22.0.2",
+    "@types/node": ">=22"
   },
   "files": [
     "admin",
     "lib",
     "lovelace",
+    "test",
     "main.js",
     "io-package.json",
+    "package.json",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
-  ],
-  "readmeFilename": "README.md"
+    "tsconfig.json"
+  ]
 }

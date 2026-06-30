@@ -1,32 +1,27 @@
-# Adapter check preparation report
+# Adapter check fix report
 
-Version: 0.6.1
+Version: 0.6.3
 
-Runtime source code kept unchanged:
-- main.js
-- lib/modbusClient.js
-- lib/registerMap.js
-- lovelace/victronadapter-card.js
+Fixed from the uploaded checker list:
+- Repository/package metadata uses lowercase adapter name `victronadapter`.
+- Repository URLs point to `https://github.com/FreeProgrammer1/ioBroker.victronadapter`.
+- Removed `@iobroker/repochecker` from dependencies.
+- Removed deprecated `common.license`; kept `common.licenseInformation`.
+- Updated Admin global dependency to `>=7.6.20`.
+- Added all required admin i18n languages in short format.
+- Added JSONConfig responsive attributes.
+- Added GitHub workflow and Dependabot configuration.
+- Added README changelog and final license section with copyright line.
+- Removed direct npm/GitHub adapter installation commands from README.
+- Added `.commitinfo` to `.gitignore`.
+- Added package-lock.json.
+- Updated Node engine to `>=22`.
+- Updated adapter-core to `^3.4.1`.
+- Added lint script and development metadata.
+- Fixed Node built-in imports and timer usage without changing adapter behavior.
 
-Added/updated non-runtime project files:
-- package.json metadata and scripts
-- io-package.json metadata
-- README.md
-- CHANGELOG.md
-- admin/index.html fallback for older checks
-- .github/workflows/test-and-release.yml
-- .github/dependabot.yml
-- .gitignore
-- .editorconfig
-- .npmignore
-- test/metadata.test.js
-
-Local checks:
-- npm run test:js: OK
-- npm run test:unit: OK
-- npm run test:package: OK
-- npm test: OK
-
-Repository checker:
-- Correct command added: npm run adapter-check
-- In this sandbox the command reached repochecker 5.19.5 but failed because api.github.com was not reachable / the GitHub repository is not accessible from this environment.
+External items that still require GitHub/npm actions:
+- Rename/create the repository as `FreeProgrammer1/ioBroker.victronadapter`.
+- Add repository topics in GitHub settings.
+- Publish the package on npm before repository inclusion.
+- Create a GitHub release after pushing the tag.

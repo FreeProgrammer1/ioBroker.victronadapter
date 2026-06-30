@@ -1,35 +1,35 @@
 {
   "common": {
     "name": "victronadapter",
-    "version": "0.6.2",
+    "version": "0.6.3",
     "titleLang": {
-      "en": "Victron Adapter",
-      "de": "Victron Adapter",
-      "ru": "Victron Adapter",
-      "pt": "Victron Adapter",
-      "nl": "Victron Adapter",
-      "fr": "Victron Adapter",
-      "it": "Victron Adapter",
-      "es": "Victron Adapter",
-      "pl": "Victron Adapter",
-      "uk": "Victron Adapter",
-      "zh-cn": "Victron Adapter"
+      "en": "Victron",
+      "de": "Victron",
+      "ru": "Victron",
+      "pt": "Victron",
+      "nl": "Victron",
+      "fr": "Victron",
+      "it": "Victron",
+      "es": "Victron",
+      "pl": "Victron",
+      "uk": "Victron",
+      "zh-cn": "Victron"
     },
     "desc": {
-      "en": "Adapter for Victron GX/Cerbo GX systems via Modbus TCP with dashboard states, controls, device discovery and clean Lovelace energy cards.",
-      "de": "Adapter für Victron GX/Cerbo-GX-Systeme per Modbus TCP mit Dashboard-Datenpunkten, Steuerung, Gerätesuche und bereinigten Lovelace-Energiekarten.",
-      "ru": "Адаптер для систем Victron GX/Cerbo GX через Modbus TCP с состояниями панели, управлением, поиском устройств и чистыми картами Lovelace.",
-      "pt": "Adaptador para sistemas Victron GX/Cerbo GX via Modbus TCP com estados de painel, controle, descoberta e cartões Lovelace limpos.",
-      "nl": "Adapter voor Victron GX/Cerbo GX-systemen via Modbus TCP met dashboard-states, bediening, detectie en opgeschoonde Lovelace-kaarten.",
-      "fr": "Adaptateur pour systèmes Victron GX/Cerbo GX via Modbus TCP avec états, contrôle, découverte et cartes Lovelace nettoyées.",
-      "it": "Adattatore per sistemi Victron GX/Cerbo GX via Modbus TCP con stati dashboard, controllo, rilevamento e schede Lovelace pulite.",
-      "es": "Adaptador para sistemas Victron GX/Cerbo GX mediante Modbus TCP con estados, control, detección y tarjetas Lovelace limpias.",
-      "pl": "Adapter do systemów Victron GX/Cerbo GX przez Modbus TCP ze stanami pulpitu, sterowaniem, wykrywaniem i czystymi kartami Lovelace.",
-      "uk": "Адаптер для систем Victron GX/Cerbo GX через Modbus TCP зі станами, керуванням, виявленням і чистими картами Lovelace.",
-      "zh-cn": "通过 Modbus TCP 连接 Victron GX/Cerbo GX 系统的适配器，包含仪表板状态、控制、发现和简洁的 Lovelace 能源卡。"
+      "en": "Reads Victron GX and Cerbo GX systems via Modbus TCP and provides dashboard states, controls, discovery and Lovelace energy cards.",
+      "de": "Liest Victron GX- und Cerbo-GX-Systeme per Modbus TCP und stellt Dashboard-Datenpunkte, Steuerung, Gerätesuche und Lovelace-Energiekarten bereit.",
+      "ru": "Считывает системы Victron GX и Cerbo GX через Modbus TCP и предоставляет состояния панели, управление, поиск и карты Lovelace.",
+      "pt": "Lê sistemas Victron GX e Cerbo GX via Modbus TCP e fornece estados de painel, controle, descoberta e cartões Lovelace.",
+      "nl": "Leest Victron GX- en Cerbo GX-systemen via Modbus TCP en biedt dashboard-states, bediening, detectie en Lovelace-kaarten.",
+      "fr": "Lit les systèmes Victron GX et Cerbo GX via Modbus TCP et fournit des états, commandes, découverte et cartes Lovelace.",
+      "it": "Legge sistemi Victron GX e Cerbo GX tramite Modbus TCP e fornisce stati dashboard, controllo, rilevamento e schede Lovelace.",
+      "es": "Lee sistemas Victron GX y Cerbo GX mediante Modbus TCP y proporciona estados, control, detección y tarjetas Lovelace.",
+      "pl": "Odczytuje systemy Victron GX i Cerbo GX przez Modbus TCP oraz udostępnia stany, sterowanie, wykrywanie i karty Lovelace.",
+      "uk": "Зчитує системи Victron GX і Cerbo GX через Modbus TCP та надає стани, керування, виявлення і карти Lovelace.",
+      "zh-cn": "通过 Modbus TCP 读取 Victron GX 和 Cerbo GX 系统，并提供仪表板状态、控制、发现和 Lovelace 能源卡。"
     },
     "authors": [
-      "Geht Euch <gehteuchnichtsanandroid56@gmail.com>"
+      "FreeProgrammer1"
     ],
     "keywords": [
       "victron",
@@ -40,15 +40,14 @@
       "ess",
       "pv",
       "battery",
-      "victronadapter",
-      "iobroker"
+      "solar"
     ],
     "platform": "Javascript/Node.js",
     "mode": "daemon",
     "icon": "victronadapter.svg",
     "enabled": false,
-    "extIcon": "https://raw.githubusercontent.com/gehteuchnichtsanandroid56/ioBroker.VictronAdapter/main/admin/victronadapter.svg",
-    "readme": "https://github.com/gehteuchnichtsanandroid56/ioBroker.VictronAdapter/blob/main/README.md",
+    "extIcon": "https://raw.githubusercontent.com/FreeProgrammer1/ioBroker.victronadapter/main/admin/victronadapter.svg",
+    "readme": "https://github.com/FreeProgrammer1/ioBroker.victronadapter/blob/main/README.md",
     "loglevel": "info",
     "type": "energy",
     "compact": true,
@@ -65,22 +64,29 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=6.17.14"
+        "admin": ">=7.6.20"
       }
     ],
     "news": {
-      "0.6.2": {
-        "en": "Fixes the circular Lovelace card: it now shows real circular nodes, animated flow direction indicators and uses only existing dashboard states.",
-        "de": "Korrigiert die Lovelace-Kreis-Karte: Sie zeigt jetzt echte runde Knoten, animierte Richtungsanzeigen und nutzt nur vorhandene dashboard-Datenpunkte."
+      "0.6.3": {
+        "en": "Fixes repository metadata, JSONConfig responsiveness, translations, README structure and CI files for ioBroker checks.",
+        "de": "Korrigiert Repository-Metadaten, JSONConfig-Responsiveness, Übersetzungen, README-Struktur und CI-Dateien für ioBroker-Prüfungen.",
+        "ru": "Исправлены метаданные репозитория, адаптивность JSONConfig, переводы, структура README и CI-файлы для проверок ioBroker.",
+        "pt": "Corrige metadados do repositório, responsividade JSONConfig, traduções, estrutura README e arquivos CI para verificações ioBroker.",
+        "nl": "Corrigeert repositorymetadata, JSONConfig-responsiviteit, vertalingen, README-structuur en CI-bestanden voor ioBroker-controles.",
+        "fr": "Corrige les métadonnées du dépôt, la réactivité JSONConfig, les traductions, la structure README et les fichiers CI pour les contrôles ioBroker.",
+        "it": "Corregge metadati del repository, responsività JSONConfig, traduzioni, struttura README e file CI per i controlli ioBroker.",
+        "es": "Corrige metadatos del repositorio, capacidad responsive de JSONConfig, traducciones, estructura README y archivos CI para comprobaciones ioBroker.",
+        "pl": "Poprawia metadane repozytorium, responsywność JSONConfig, tłumaczenia, strukturę README i pliki CI dla kontroli ioBroker.",
+        "uk": "Виправлено метадані репозиторію, адаптивність JSONConfig, переклади, структуру README і CI-файли для перевірок ioBroker.",
+        "zh-cn": "修正仓库元数据、JSONConfig 响应式设置、翻译、README 结构和用于 ioBroker 检查的 CI 文件。"
       }
     },
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
     },
-    "tier": 3,
-    "title": "Victron Adapter",
-    "license": "MIT"
+    "tier": 3
   },
   "native": {
     "host": "192.168.0.50",

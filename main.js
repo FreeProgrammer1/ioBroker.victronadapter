@@ -1,7 +1,7 @@
 'use strict';
 
-const fs = require('fs/promises');
-const path = require('path');
+const fs = require('node:fs/promises');
+const path = require('node:path');
 const utils = require('@iobroker/adapter-core');
 const { ModbusTcpClient } = require('./lib/modbusClient');
 const {
