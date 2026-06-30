@@ -1,0 +1,23 @@
+{
+  "Verbindung": "Connection",
+  "Automatische Suche": "Automatic discovery",
+  "Steuerung": "Control",
+  "GX IP-Adresse / Hostname": "GX IP address / hostname",
+  "Modbus TCP Port": "Modbus TCP port",
+  "Timeout je Anfrage (ms)": "Timeout per request (ms)",
+  "System Unit-ID": "System Unit ID",
+  "Abfrageintervall (ms)": "Polling interval (ms)",
+  "Angeschlossene Victron-Dienste automatisch suchen": "Automatically discover connected Victron services",
+  "Unit-ID Suche von": "Scan unit ID from",
+  "Unit-ID Suche bis": "Scan unit ID to",
+  "Suchintervall (ms)": "Discovery interval (ms)",
+  "Schreib-/Steuerbefehle erlauben": "Allow write/control commands",
+  "Steuer Unit-ID": "Control unit ID",
+  "Neuen 32-Bit Grid-Setpoint 2716/2717 verwenden": "Use new 32-bit grid setpoint 2716/2717",
+  "Legacy Grid-Setpoint 2700 zusätzlich anlegen": "Create legacy grid setpoint 2700 additionally",
+  "Minimal erlaubter Setpoint (W)": "Minimum allowed setpoint (W)",
+  "Maximal erlaubter Setpoint (W)": "Maximum allowed setpoint (W)",
+  "Raw-Schreibkanal für Tests anlegen": "Create raw write channel for testing",
+  "Unit-IDs für Suche": "Unit IDs for discovery",
+  "Kommagetrennt eintragen, z. B. 100,223,224,225,226,227,228,229,230,245,246,247. Die System-Unit-ID und Steuer-Unit-ID werden zusätzlich automatisch berücksichtigt.": "Enter comma-separated values, e.g. 100,223,224,225,226,227,228,229,230,245,246,247. The system unit ID and control unit ID are added automatically."
+}
