@@ -14,12 +14,12 @@ describe('adapter metadata', () => {
         assert.equal(pkg.version, io.common.version);
     });
 
-    it('uses the correct lowercase package and adapter names', () => {
+    it('uses lowercase package and adapter names', () => {
         assert.equal(pkg.name, 'iobroker.victronadapter');
         assert.equal(io.common.name, 'victronadapter');
     });
 
-    it('contains the required runtime files', () => {
+    it('contains required files', () => {
         for (const file of ['main.js', 'io-package.json', 'package.json', 'admin/jsonConfig.json', 'admin/victronadapter.svg']) {
             assert.equal(fs.existsSync(path.join(root, file)), true, `${file} is missing`);
         }
