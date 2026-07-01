@@ -1,7 +1,7 @@
 {
   "name": "iobroker.victronadapter",
-  "version": "0.6.11",
-  "description": "ioBroker adapter for Victron GX and Cerbo GX systems via Modbus TCP with validated package metadata and robust scan handling.",
+  "version": "0.6.12",
+  "description": "ioBroker adapter for Victron GX and Cerbo GX systems via Modbus TCP with checker-clean metadata, Node.js 22 engine and robust scan handling.",
   "author": "FreeProgrammer1",
   "license": "MIT",
   "homepage": "https://github.com/FreeProgrammer1/ioBroker.victronadapter#readme",
@@ -27,7 +27,7 @@
   ],
   "main": "main.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "start": "node main.js",
@@ -57,8 +57,6 @@
     "io-package.json",
     "package.json",
     "README.md",
-    "CHANGELOG.md",
-    "CHANGELOG_OLD.md",
     "LICENSE",
     "tsconfig.json",
     "eslint.config.mjs",

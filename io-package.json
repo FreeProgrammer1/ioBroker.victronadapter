@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "victronadapter",
-    "version": "0.6.11",
+    "version": "0.6.12",
     "titleLang": {
       "en": "Victron",
       "de": "Victron",
@@ -68,6 +68,32 @@
       }
     ],
     "news": {
+      "0.6.12": {
+        "en": "Cleans checker-relevant release metadata: Node.js 22 engine, GitHub Actions matrix with Node.js 20 and 22, README-only changelog, complete news translations and no standalone changelog files in the package.",
+        "de": "Bereinigt checkerrelevante Release-Metadaten: Node.js-22-Engine, GitHub-Actions-Matrix mit Node.js 20 und 22, Changelog nur in der README, vollständige News-Übersetzungen und keine separaten Changelog-Dateien im Paket.",
+        "ru": "Очищены метаданные релиза для проверки: движок Node.js 22, матрица GitHub Actions с Node.js 20 и 22, changelog только в README, полные переводы news и без отдельных файлов changelog в пакете.",
+        "pt": "Limpa metadados de release relevantes para o checker: engine Node.js 22, matriz GitHub Actions com Node.js 20 e 22, changelog apenas no README, traduções completas de news e sem arquivos changelog separados no pacote.",
+        "nl": "Schoont release-metadata voor de checker op: Node.js 22-engine, GitHub Actions-matrix met Node.js 20 en 22, changelog alleen in README, volledige news-vertalingen en geen losse changelogbestanden in het pakket.",
+        "fr": "Nettoie les métadonnées de version pour le checker : moteur Node.js 22, matrice GitHub Actions avec Node.js 20 et 22, changelog uniquement dans README, traductions news complètes et aucun fichier changelog séparé dans le paquet.",
+        "it": "Ripulisce i metadati di rilascio rilevanti per il checker: engine Node.js 22, matrice GitHub Actions con Node.js 20 e 22, changelog solo nel README, traduzioni news complete e nessun file changelog separato nel pacchetto.",
+        "es": "Limpia los metadatos de lanzamiento relevantes para el checker: motor Node.js 22, matriz de GitHub Actions con Node.js 20 y 22, changelog solo en README, traducciones completas de news y sin archivos changelog separados en el paquete.",
+        "pl": "Czyści metadane wydania istotne dla checkera: silnik Node.js 22, macierz GitHub Actions z Node.js 20 i 22, changelog tylko w README, pełne tłumaczenia news i brak osobnych plików changelog w paczce.",
+        "uk": "Очищено метадані релізу для checker: рушій Node.js 22, матриця GitHub Actions з Node.js 20 і 22, changelog лише в README, повні переклади news і без окремих файлів changelog у пакеті.",
+        "zh-cn": "清理检查器相关的发布元数据：Node.js 22 引擎、包含 Node.js 20 和 22 的 GitHub Actions 矩阵、仅在 README 中保留 changelog、完整 news 翻译，并且包内没有单独的 changelog 文件。"
+      },
+      "0.6.11": {
+        "en": "Fixes release package metadata consistency and keeps robust scan/unload handling from 0.6.8.",
+        "de": "Korrigiert die Paket-Metadaten für den ioBroker-Check und behält die robuste Scan-/Unload-Behandlung aus 0.6.8 bei.",
+        "ru": "Обновление адаптера с улучшениями совместимости и надежности.",
+        "pt": "Atualização do adaptador com melhorias de compatibilidade e robustez.",
+        "nl": "Adapterupdate met verbeteringen voor compatibiliteit en betrouwbaarheid.",
+        "fr": "Mise à jour de l’adaptateur avec améliorations de compatibilité et de robustesse.",
+        "it": "Aggiornamento dell’adattatore con miglioramenti di compatibilità e robustezza.",
+        "es": "Actualización del adaptador con mejoras de compatibilidad y robustez.",
+        "pl": "Aktualizacja adaptera z ulepszeniami zgodności i niezawodności.",
+        "uk": "Оновлення адаптера з покращеннями сумісності та надійності.",
+        "zh-cn": "适配器更新，改进兼容性和稳定性。"
+      },
       "0.6.10": {
         "en": "Fixes repository checker issues from 0.6.9: removes the premature release-script dependency, fixes jsonConfig root attributes and documents old changelog linkage.",
         "de": "Behebt Repository-Checker-Probleme aus 0.6.9: entfernt die verfrühte release-script-Abhängigkeit, korrigiert jsonConfig-Root-Attribute und dokumentiert die Verknüpfung zum alten Changelog.",
@@ -132,10 +158,6 @@
         "pl": "Czyste wydanie bez starych plików repozytorium i z poprawionymi metadanymi sprawdzania.",
         "uk": "Чистий релізний пакет без старих файлів репозиторію та з виправленими метаданими перевірки.",
         "zh-cn": "干净的发布包，不含旧仓库文件，并修正检查元数据。"
-      },
-      "0.6.11": {
-        "en": "Fixes release package metadata consistency and keeps robust scan/unload handling from 0.6.8.",
-        "de": "Korrigiert die Paket-Metadaten für den ioBroker-Check und behält die robuste Scan-/Unload-Behandlung aus 0.6.8 bei."
       }
     },
     "licenseInformation": {

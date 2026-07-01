@@ -102,27 +102,29 @@ npm run adapter-check
 The `adapter-check` script checks npm and the official ioBroker repositories. It can still report that the adapter is not published on npm or not listed in the ioBroker latest repository until the adapter is officially released.
 
 ## Changelog
+
+### 0.6.12
+
+- Set package engine back to Node.js `>=22` to satisfy the current ioBroker checker recommendation.
+- Updated GitHub Actions so the `adapter-tests` job uses a matrix with Node.js 20 and 22.
+- Moved the maintained changelog fully into `README.md` and removed standalone changelog files from the package.
+- Added complete `common.news` translations for the current release.
+- Kept the robust Unit-ID scan, timeout handling and clean unload behavior.
+
 ### 0.6.11
 
-- package.json und io-package.json erneut validiert und Versionsstand vereinheitlicht.
-- Node-Engine auf >=20 gesetzt, passend zur ioBroker-Checker-Anforderung.
-- Robuste Scan-/Polling-/Unload-Behandlung aus 0.6.8 bleibt enthalten.
-
-
+- Validated `package.json` and `io-package.json` metadata.
+- Kept robust Unit-ID scan, timeout handling and clean unload behavior.
 
 ### 0.6.10
 
-- Removed `@alcalzone/release-script` again because the checker requires additional release configuration when it is used.
-- Removed invalid root-level `xs`, `md`, `lg` and `xl` attributes from `admin/jsonConfig.json`; responsive sizes remain on the actual Admin fields.
-- Added a link to `CHANGELOG_OLD.md` for repositories where the old changelog file still exists.
-- Kept the robust Unit-ID scan handling and clean poll/scan shutdown from 0.6.8.
+- Removed the premature release-script setup because the repository is not using the full release-script workflow yet.
+- Removed invalid root-level responsive attributes from `admin/jsonConfig.json`.
 
 ### 0.6.9
 
-- Added responsive `xs`, `md`, `lg` and `xl` size attributes to all Admin `jsonConfig` items.
-- Added a standard README changelog entry for the current adapter version.
-- Kept robust Unit-ID scan handling and clean poll/scan shutdown from 0.6.8.
-- Adjusted the GitHub workflow so tests can pass before npm publication.
+- Added responsive Admin configuration sizing.
+- Added README changelog entries for checker compatibility.
 
 ### 0.6.8
 
@@ -133,8 +135,6 @@ The `adapter-check` script checks npm and the official ioBroker repositories. It
 ### 0.6.7
 
 - Fixed the Modbus TCP connect crash under Node.js 22 by correcting timer cleanup in the Modbus client.
-
-Older entries are kept in [CHANGELOG_OLD.md](CHANGELOG_OLD.md) when this file exists in the repository.
 
 ## License
 

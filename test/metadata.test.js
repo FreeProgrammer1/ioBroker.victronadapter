@@ -31,8 +31,11 @@ describe('adapter metadata', () => {
         assert.equal(fs.existsSync(path.join(root, 'lovelace/victronadapter-flow-circle.yaml')), true);
     });
 
-    it('uses responsive size attributes in admin jsonConfig', () => {
+    it('uses responsive size attributes in admin jsonConfig items only', () => {
         const jsonConfig = JSON.parse(fs.readFileSync(path.join(root, 'admin/jsonConfig.json'), 'utf8'));
+        for (const size of ['xs', 'md', 'lg', 'xl']) {
+            assert.equal(Object.prototype.hasOwnProperty.call(jsonConfig, size), false, `${size} must not be at jsonConfig root`);
+        }
         const visit = obj => {
             if (!obj || typeof obj !== 'object') return;
             if (obj.type && obj.type !== 'tabs' && obj.type !== 'panel') {
@@ -50,7 +53,37 @@ describe('adapter metadata', () => {
     it('documents the current version in the README changelog', () => {
         const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
         assert.match(readme, new RegExp(`## Changelog[\\s\\S]*### ${pkg.version.replace(/\./g, '\\.')}`));
-        assert.match(readme, /### 0\.6\.9[\s\S]*- /);
+        assert.match(readme, /### 0\.6\.12[\s\S]*- /);
     });
 
+    it('keeps changelog only in README for checker compatibility', () => {
+        assert.equal(fs.existsSync(path.join(root, 'CHANGELOG.md')), false);
+        assert.equal(fs.existsSync(path.join(root, 'CHANGELOG_OLD.md')), false);
+        assert.equal(pkg.files.includes('CHANGELOG.md'), false);
+        assert.equal(pkg.files.includes('CHANGELOG_OLD.md'), false);
+    });
+
+    it('uses Node.js 22 engine and matching type configuration', () => {
+        assert.equal(pkg.engines.node, '>=22');
+        assert.ok(pkg.devDependencies['@types/node'].startsWith('^22.'));
+        assert.ok(pkg.devDependencies['@tsconfig/node22']);
+        const tsconfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.json'), 'utf8'));
+        assert.equal(tsconfig.extends, '@tsconfig/node22/tsconfig.json');
+    });
+
+    it('contains all suggested io-package news translations', () => {
+        const languages = ['en','de','ru','pt','nl','fr','it','es','pl','uk','zh-cn'];
+        for (const [version, entry] of Object.entries(io.common.news)) {
+            for (const language of languages) {
+                assert.equal(typeof entry[language], 'string', `${version} missing ${language}`);
+                assert.notEqual(entry[language].trim(), '', `${version} empty ${language}`);
+            }
+        }
+    });
+
+    it('has adapter-tests workflow matrix with Node.js 20 and 22', () => {
+        const workflow = fs.readFileSync(path.join(root, '.github/workflows/test-and-release.yml'), 'utf8');
+        assert.match(workflow, /adapter-tests:/);
+        assert.match(workflow, /node-version:\s*\[20,\s*22\]/);
+    });
 });
