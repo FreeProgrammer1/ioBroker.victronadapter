@@ -1,7 +1,7 @@
 {
   "name": "iobroker.victronadapter",
-  "version": "0.6.10",
-  "description": "ioBroker adapter for Victron GX and Cerbo GX systems via Modbus TCP with checker-compatible admin layout and robust scan handling.",
+  "version": "0.6.11",
+  "description": "ioBroker adapter for Victron GX and Cerbo GX systems via Modbus TCP with validated package metadata and robust scan handling.",
   "author": "FreeProgrammer1",
   "license": "MIT",
   "homepage": "https://github.com/FreeProgrammer1/ioBroker.victronadapter#readme",
@@ -27,7 +27,7 @@
   ],
   "main": "main.js",
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "scripts": {
     "start": "node main.js",

@@ -102,6 +102,13 @@ npm run adapter-check
 The `adapter-check` script checks npm and the official ioBroker repositories. It can still report that the adapter is not published on npm or not listed in the ioBroker latest repository until the adapter is officially released.
 
 ## Changelog
+### 0.6.11
+
+- package.json und io-package.json erneut validiert und Versionsstand vereinheitlicht.
+- Node-Engine auf >=20 gesetzt, passend zur ioBroker-Checker-Anforderung.
+- Robuste Scan-/Polling-/Unload-Behandlung aus 0.6.8 bleibt enthalten.
+
+
 
 ### 0.6.10
 

@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "victronadapter",
-    "version": "0.6.10",
+    "version": "0.6.11",
     "titleLang": {
       "en": "Victron",
       "de": "Victron",
@@ -132,6 +132,10 @@
         "pl": "Czyste wydanie bez starych plików repozytorium i z poprawionymi metadanymi sprawdzania.",
         "uk": "Чистий релізний пакет без старих файлів репозиторію та з виправленими метаданими перевірки.",
         "zh-cn": "干净的发布包，不含旧仓库文件，并修正检查元数据。"
+      },
+      "0.6.11": {
+        "en": "Fixes release package metadata consistency and keeps robust scan/unload handling from 0.6.8.",
+        "de": "Korrigiert die Paket-Metadaten für den ioBroker-Check und behält die robuste Scan-/Unload-Behandlung aus 0.6.8 bei."
       }
     },
     "licenseInformation": {

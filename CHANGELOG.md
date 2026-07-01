@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.11
+
+- Fixed package metadata consistency for ioBroker checker runs.
+- Set Node engine range to >=20 while keeping Node 22 compatibility.
+- Kept robust Unit-ID scan, timeout handling and clean unload behavior.
+
 ## 0.6.10
 
 - Removed `@alcalzone/release-script` from `devDependencies` because the adapter is not using the full release-script workflow yet. This avoids `.releaseconfig.json` checker errors.
