@@ -99,7 +99,19 @@ npm run adapter-check
 
 ## Changelog
 
-### 0.6.6
+## 0.6.8
+
+- Added robust Unit-ID scan handling.
+- Added debug summary per checked Unit-ID.
+- Added per Unit-ID timeout/error handling so one bad Unit-ID does not stop the complete scan.
+- Continued scanning after non-responsive Unit-IDs.
+- Added clean cancellation of running scans and polls during adapter unload/terminate to avoid DB-closed follow-up errors.
+
+## 0.6.7 Modbus TCP crash fix
+
+This release fixes a startup crash on Node.js 22 after a successful Modbus TCP connection to a Venus GX/Cerbo GX device. The Modbus client now uses the correct Node.js timer cleanup calls during connect and write-error handling.
+
+## 0.6.6
 
 - Rechecked package contents against the remaining checker errors.
 - Confirmed no `xs`, `md`, `lg` or `xl` attributes are present in `admin/jsonConfig.json`.
@@ -115,8 +127,3 @@ Older entries are stored in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 MIT License
 
 Copyright (c) 2026 FreeProgrammer1
-
-## 0.6.7 Modbus TCP crash fix
-
-This release fixes a startup crash on Node.js 22 after a successful Modbus TCP connection to a Venus GX/Cerbo GX device. The Modbus client now uses the correct Node.js timer cleanup calls during connect and write-error handling.
-
