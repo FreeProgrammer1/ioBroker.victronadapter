@@ -56,9 +56,11 @@ describe('adapter metadata', () => {
         assert.match(readme, /### 0\.6\.12[\s\S]*- /);
     });
 
-    it('keeps changelog only in README for checker compatibility', () => {
+    it('keeps current changelog in README and excludes old changelog from npm package', () => {
+        const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
         assert.equal(fs.existsSync(path.join(root, 'CHANGELOG.md')), false);
-        assert.equal(fs.existsSync(path.join(root, 'CHANGELOG_OLD.md')), false);
+        assert.equal(fs.existsSync(path.join(root, 'CHANGELOG_OLD.md')), true);
+        assert.match(readme, /CHANGELOG_OLD\.md/);
         assert.equal(pkg.files.includes('CHANGELOG.md'), false);
         assert.equal(pkg.files.includes('CHANGELOG_OLD.md'), false);
     });

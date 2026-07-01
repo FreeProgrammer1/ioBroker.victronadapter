@@ -103,6 +103,12 @@ The `adapter-check` script checks npm and the official ioBroker repositories. It
 
 ## Changelog
 
+### 0.6.13
+
+- Fixed GitHub workflow metadata so the adapter-tests job explicitly covers Node.js 20 and 22.
+- Kept runtime metadata on Node.js 22 while making the workflow tolerant of npm engine warnings during the required Node.js 20 check.
+- Added a checker-compatible old changelog file and link without publishing it to npm.
+
 ### 0.6.12
 
 - Set package engine back to Node.js `>=22` to satisfy the current ioBroker checker recommendation.
@@ -141,3 +147,5 @@ The `adapter-check` script checks npm and the official ioBroker repositories. It
 MIT License
 
 Copyright (c) 2026 FreeProgrammer1
+
+Older changelog entries: [CHANGELOG_OLD.md](CHANGELOG_OLD.md).

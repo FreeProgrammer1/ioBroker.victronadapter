@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "victronadapter",
-    "version": "0.6.12",
+    "version": "0.6.13",
     "titleLang": {
       "en": "Victron",
       "de": "Victron",
@@ -68,6 +68,19 @@
       }
     ],
     "news": {
+      "0.6.13": {
+        "en": "Fixes the GitHub workflow metadata and adds a checker-compatible old changelog link while keeping Node.js 22 runtime metadata.",
+        "de": "Korrigiert die GitHub-Workflow-Metadaten und ergänzt einen checker-kompatiblen Link auf das alte Changelog bei unveränderter Node.js-22-Laufzeitangabe.",
+        "ru": "Исправлены метаданные рабочего процесса GitHub и добавлена совместимая с проверкой ссылка на старый журнал изменений при сохранении метаданных Node.js 22.",
+        "pt": "Corrige os metadados do fluxo de trabalho do GitHub e adiciona um link de changelog antigo compatível com o verificador, mantendo os metadados do Node.js 22.",
+        "nl": "Corrigeert de GitHub-workflowmetadata en voegt een checker-compatibele link naar de oude changelog toe met behoud van Node.js 22-runtimegegevens.",
+        "fr": "Corrige les métadonnées du workflow GitHub et ajoute un lien vers l’ancien changelog compatible avec le vérificateur tout en conservant les métadonnées Node.js 22.",
+        "it": "Corregge i metadati del workflow GitHub e aggiunge un link al vecchio changelog compatibile con il checker mantenendo i metadati Node.js 22.",
+        "es": "Corrige los metadatos del flujo de trabajo de GitHub y añade un enlace al changelog antiguo compatible con el verificador manteniendo los metadatos de Node.js 22.",
+        "pl": "Poprawia metadane workflow GitHub i dodaje zgodny ze sprawdzaniem link do starego changeloga, zachowując metadane środowiska Node.js 22.",
+        "uk": "Виправлено метадані робочого процесу GitHub і додано сумісне з перевіркою посилання на старий журнал змін зі збереженням метаданих Node.js 22.",
+        "zh-cn": "修复 GitHub 工作流元数据，并添加兼容检查器的旧变更日志链接，同时保留 Node.js 22 运行时元数据。"
+      },
       "0.6.12": {
         "en": "Cleans checker-relevant release metadata: Node.js 22 engine, GitHub Actions matrix with Node.js 20 and 22, README-only changelog, complete news translations and no standalone changelog files in the package.",
         "de": "Bereinigt checkerrelevante Release-Metadaten: Node.js-22-Engine, GitHub-Actions-Matrix mit Node.js 20 und 22, Changelog nur in der README, vollständige News-Übersetzungen und keine separaten Changelog-Dateien im Paket.",
