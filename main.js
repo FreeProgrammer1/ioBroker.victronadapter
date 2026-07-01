@@ -1247,7 +1247,7 @@ class VictronHouseControl extends utils.Adapter {
         const gridFlow = this._deadband(gridTotal, gridDeadband);
         const batteryFlow = this._deadband(batteryPower, 25);
         const snapshot = {
-            version: '0.5.3',
+            version: '0.6.9',
             timestamp: new Date().toISOString(),
             timestampMs: Date.now(),
             grid: {
@@ -1419,7 +1419,7 @@ class VictronHouseControl extends utils.Adapter {
         };
 
         const payload = {
-            version: '0.5.3',
+            version: '0.6.9',
             revision: this.viewRevision,
             updatedAt: snapshot.timestamp || new Date().toISOString(),
             updatedMs: Number.isFinite(snapshot.timestampMs) ? snapshot.timestampMs : Date.now(),

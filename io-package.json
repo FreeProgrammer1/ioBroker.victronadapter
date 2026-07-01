@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "victronadapter",
-    "version": "0.6.8",
+    "version": "0.6.9",
     "titleLang": {
       "en": "Victron",
       "de": "Victron",
@@ -68,6 +68,19 @@
       }
     ],
     "news": {
+      "0.6.9": {
+        "en": "Fixes checker compatibility: adds responsive jsonConfig sizes, documents the current release in the README changelog and keeps the robust scan/shutdown handling.",
+        "de": "Verbessert die Checker-Kompatibilität: ergänzt responsive jsonConfig-Größen, dokumentiert die aktuelle Version im README-Changelog und behält die robuste Scan-/Shutdown-Behandlung bei.",
+        "ru": "Улучшена совместимость с проверкой: добавлены адаптивные размеры jsonConfig, текущий релиз задокументирован в README changelog, сохранена надежная обработка сканирования и остановки.",
+        "pt": "Melhora a compatibilidade com o checker: adiciona tamanhos responsivos no jsonConfig, documenta a versão atual no changelog do README e mantém o tratamento robusto de varredura/desligamento.",
+        "nl": "Verbetert checker-compatibiliteit: voegt responsieve jsonConfig-afmetingen toe, documenteert de huidige release in de README-changelog en behoudt robuuste scan-/shutdown-afhandeling.",
+        "fr": "Améliore la compatibilité avec le checker : ajoute les tailles responsives jsonConfig, documente la version actuelle dans le changelog README et conserve la gestion robuste du scan/arrêt.",
+        "it": "Migliora la compatibilità con il checker: aggiunge dimensioni responsive a jsonConfig, documenta la versione corrente nel changelog README e mantiene la gestione robusta di scansione/arresto.",
+        "es": "Mejora la compatibilidad con el checker: añade tamaños responsive a jsonConfig, documenta la versión actual en el changelog del README y mantiene el manejo robusto de escaneo/apagado.",
+        "pl": "Poprawia zgodność z checkerem: dodaje responsywne rozmiary jsonConfig, dokumentuje bieżącą wersję w changelogu README i zachowuje stabilną obsługę skanowania/zamykania.",
+        "uk": "Покращено сумісність із перевіркою: додано адаптивні розміри jsonConfig, поточний реліз описано в README changelog, збережено надійну обробку сканування/завершення.",
+        "zh-cn": "改进检查器兼容性：添加响应式 jsonConfig 尺寸，在 README changelog 中记录当前版本，并保留稳健的扫描/关闭处理。"
+      },
       "0.6.8": {
         "en": "Adds robust Unit-ID scan handling: debug summary per checked Unit-ID, per-unit timeout/error handling, continued scans after non-responsive IDs and clean cancellation of active scans/polls during adapter unload.",
         "de": "Ergänzt eine robuste Unit-ID-Suche: Debug-Zusammenfassung je geprüfter Unit-ID, sauberes Timeout-/Fehlerhandling pro Unit-ID, Weiterscannen nach nicht antwortenden IDs und sauberes Abbrechen laufender Scans/Polls beim Adapter-Unload.",

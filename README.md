@@ -28,19 +28,21 @@ This GitHub-ready package is already cleaned for the repository checker. Upload 
 
 ## Features
 
-- Reads Victron GX and Cerbo GX systems via Modbus TCP
-- Provides dashboard states for grid, PV, battery, AC loads and essential loads
-- Supports controls for selected Victron settings
-- Supports automatic discovery with a comma-separated Modbus Unit ID list
-- Provides a clean Lovelace card with normal and circular energy-flow examples
+- Reads Victron GX and Cerbo GX systems via Modbus TCP.
+- Provides dashboard states for grid, PV, battery, AC loads and essential loads.
+- Supports controls for selected Victron settings.
+- Supports automatic discovery with a comma-separated Modbus Unit-ID list.
+- Continues scanning when one Unit-ID does not answer or returns an exception.
+- Stops running scans and polls cleanly on adapter unload/terminate.
+- Provides a clean Lovelace card with normal and circular energy-flow examples.
 
 ## Requirements
 
-- Node.js 22 or newer
-- ioBroker js-controller 6.0.11 or newer
-- ioBroker Admin 7.6.20 or newer
-- Victron GX or Cerbo GX with Modbus TCP enabled
-- Network access from ioBroker to the GX device
+- Node.js 22 or newer.
+- ioBroker js-controller 6.0.11 or newer.
+- ioBroker Admin 7.6.20 or newer.
+- Victron GX, Cerbo GX or Venus OS device with Modbus TCP enabled.
+- Network access from ioBroker to the GX device.
 
 ## Configuration
 
@@ -48,12 +50,12 @@ Configure the adapter instance in ioBroker Admin.
 
 Important settings:
 
-- GX IP address or hostname
-- Modbus TCP port, normally `502`
-- System Unit ID, normally `100`
-- Poll interval
-- Automatic discovery
-- Comma-separated Unit IDs for discovery
+- GX IP address or hostname.
+- Modbus TCP port, normally `502`.
+- System Unit-ID, normally `100`.
+- Poll interval.
+- Automatic discovery.
+- Comma-separated Unit-IDs for discovery.
 
 Default discovery list:
 
@@ -61,7 +63,7 @@ Default discovery list:
 100,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247
 ```
 
-The configured system Unit ID and control Unit ID are always included automatically.
+The configured system Unit-ID and control Unit-ID are always included automatically.
 
 ## Lovelace
 
@@ -97,30 +99,26 @@ npm run lint
 npm run adapter-check
 ```
 
+The `adapter-check` script checks npm and the official ioBroker repositories. It can still report that the adapter is not published on npm or not listed in the ioBroker latest repository until the adapter is officially released.
+
 ## Changelog
 
-## 0.6.8
+### 0.6.9
 
-- Added robust Unit-ID scan handling.
-- Added debug summary per checked Unit-ID.
-- Added per Unit-ID timeout/error handling so one bad Unit-ID does not stop the complete scan.
-- Continued scanning after non-responsive Unit-IDs.
-- Added clean cancellation of running scans and polls during adapter unload/terminate to avoid DB-closed follow-up errors.
+- Added responsive `xs`, `md`, `lg` and `xl` size attributes to all Admin `jsonConfig` items.
+- Added a standard README changelog entry for the current adapter version.
+- Kept robust Unit-ID scan handling and clean poll/scan shutdown from 0.6.8.
+- Adjusted the GitHub workflow so tests can pass before npm publication.
 
-## 0.6.7 Modbus TCP crash fix
+### 0.6.8
 
-This release fixes a startup crash on Node.js 22 after a successful Modbus TCP connection to a Venus GX/Cerbo GX device. The Modbus client now uses the correct Node.js timer cleanup calls during connect and write-error handling.
+- Added debug logging per checked Unit-ID.
+- Added per Unit-ID timeout/error handling so scanning continues when a Unit-ID does not answer.
+- Added clean cancellation of running scans and polls during unload/terminate.
 
-## 0.6.6
+### 0.6.7
 
-- Rechecked package contents against the remaining checker errors.
-- Confirmed no `xs`, `md`, `lg` or `xl` attributes are present in `admin/jsonConfig.json`.
-- Confirmed no `.npmignore`, `.prettierignore` or `CHANGELOG.md` is present.
-- Confirmed `lib/modbusClient.js` uses `node:net` and contains no plain `setTimeout(` token.
-- Confirmed i18n files do not contain values identical to English for the checked languages.
-- Added cleanup helper scripts for stale repository files.
-
-Older entries are stored in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
+- Fixed the Modbus TCP connect crash under Node.js 22 by correcting timer cleanup in the Modbus client.
 
 ## License
 
