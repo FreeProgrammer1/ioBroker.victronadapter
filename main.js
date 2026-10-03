@@ -68,7 +68,9 @@ const LIVE_NAMES_EN = {
  * @param {string} id state id without channel
  */
 function liveNameEn(id) {
-    if (LIVE_NAMES_EN[id]) return LIVE_NAMES_EN[id];
+    if (LIVE_NAMES_EN[id]) {
+        return LIVE_NAMES_EN[id];
+    }
     const phase = id.match(/^(.*)_l([123])$/);
     if (phase) {
         const base = {
@@ -78,7 +80,9 @@ function liveNameEn(id) {
             ac_loads: 'AC loads',
             essential_loads: 'Essential loads'
         }[phase[1]];
-        if (base) return `${base} L${phase[2]}`;
+        if (base) {
+            return `${base} L${phase[2]}`;
+        }
     }
     return id.replace(/_/g, ' ');
 }
@@ -147,7 +151,9 @@ class VictronAdapter extends utils.Adapter {
             this.log.error(`Startup failed: ${error.message}`);
             await this.safeSetStateAsync('info.connection', false, true).catch(() => undefined);
             // Only keep polling when the configuration itself was valid and a client exists.
-            if (this.client) this.schedulePolling();
+            if (this.client) {
+                this.schedulePolling();
+            }
         }
     }
 
@@ -169,7 +175,9 @@ class VictronAdapter extends utils.Adapter {
                 const from = Math.max(1, Math.min(255, Number(cfg.scanFrom || 223)));
                 const to = Math.max(1, Math.min(255, Number(cfg.scanTo || 247)));
                 const range = [];
-                for (let id = Math.min(from, to); id <= Math.max(from, to); id++) range.push(id);
+                for (let id = Math.min(from, to); id <= Math.max(from, to); id++) {
+                    range.push(id);
+                }
                 cfg.scanUnitIds = [cfg.unitIdSystem, cfg.controlUnitId, ...range].join(',');
             } else {
                 cfg.scanUnitIds = defaultScanUnitIds;
@@ -222,13 +230,15 @@ class VictronAdapter extends utils.Adapter {
     /**
      * Validates the user defined register table from the admin UI.
      *
-     * @param {any} rows table rows from the instance configuration
+     * @param {unknown} rows table rows from the instance configuration
      */
     normalizeCustomRegisters(rows) {
         const result = [];
         const seen = new Set();
         for (const row of Array.isArray(rows) ? rows : []) {
-            if (!row || row.enabled === false) continue;
+            if (!row || row.enabled === false) {
+                continue;
+            }
             const unitId = Number(row.unitId);
             const address = Number(row.address);
             const type = CUSTOM_REGISTER_TYPES.includes(row.type) ? row.type : 'uint16';
@@ -272,13 +282,17 @@ class VictronAdapter extends utils.Adapter {
     }
 
     schedulePolling() {
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         this.clearTimer('pollTimer');
         this.pollTimer = this.setInterval(() => this.pollOnce(), Math.max(1000, this.config.pollInterval));
     }
 
     scheduleScan() {
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         this.clearTimer('scanTimer');
         this.scanTimer = this.setInterval(() => this.scanDevices(), Math.max(60000, this.config.scanInterval));
     }
@@ -314,13 +328,19 @@ class VictronAdapter extends utils.Adapter {
     }
 
     async safeSetStateAsync(id, value, ack = true) {
-        if (this.isStopping) return false;
+        if (this.isStopping) {
+            return false;
+        }
         // Only write when the value changed. This keeps the load on the states DB and on
         // history adapters low; live signals (timestamps, revision, JSON snapshots) change anyway.
-        if (ack && this.stateCache.has(id) && this.stateCache.get(id) === value) return true;
+        if (ack && this.stateCache.has(id) && this.stateCache.get(id) === value) {
+            return true;
+        }
         try {
             await this.setStateAsync(id, value, ack);
-            if (ack) this.stateCache.set(id, value);
+            if (ack) {
+                this.stateCache.set(id, value);
+            }
             return true;
         } catch (error) {
             if (this.isShutdownError(error)) {
@@ -543,7 +563,9 @@ class VictronAdapter extends utils.Adapter {
             let changed = false;
             for (const file of files) {
                 const current = await this.readForeignFileText(instance, file);
-                if (current === sources[file]) continue;
+                if (current === sources[file]) {
+                    continue;
+                }
                 await this.writeFileAsync(instance, file, sources[file]);
                 changed = true;
                 this.log.info(`Lovelace file installed/updated: /${instance}/${file}`);
@@ -662,9 +684,13 @@ class VictronAdapter extends utils.Adapter {
             'ev_power'
         ];
         const lines = [`type: ${type}`, 'title: Energiefluss', 'subtitle: Victron Adapter', 'show_details: true'];
-        if (circle) lines.push('transparent_background: true');
+        if (circle) {
+            lines.push('transparent_background: true');
+        }
         lines.push(...extraLines);
-        if (!extraLines.some((line) => line.startsWith('show_debug'))) lines.push('show_debug: true');
+        if (!extraLines.some((line) => line.startsWith('show_debug'))) {
+            lines.push('show_debug: true');
+        }
         lines.push('values:');
         for (const key of keys) {
             lines.push(`  ${key}:`, `    - ${sensorPrefix}_${key}`, `    - ${ns}.dashboard.${key}`);
@@ -677,9 +703,15 @@ class VictronAdapter extends utils.Adapter {
         if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'file')) {
             value = value.file;
         }
-        if (Buffer.isBuffer(value)) return value.toString('utf8');
-        if (value instanceof Uint8Array) return Buffer.from(value).toString('utf8');
-        if (value === null || value === undefined) return '';
+        if (Buffer.isBuffer(value)) {
+            return value.toString('utf8');
+        }
+        if (value instanceof Uint8Array) {
+            return Buffer.from(value).toString('utf8');
+        }
+        if (value === null || value === undefined) {
+            return '';
+        }
         return String(value);
     }
 
@@ -698,12 +730,18 @@ class VictronAdapter extends utils.Adapter {
     }
 
     buildLovelaceCustom(objectId, definition, writable, common = {}) {
-        if (!this.config.installLovelaceCard) return null;
+        if (!this.config.installLovelaceCard) {
+            return null;
+        }
         const instance = String(this.config.lovelaceInstance || 'lovelace.0').trim() || 'lovelace.0';
-        if (!/^lovelace\.\d+$/.test(instance)) return null;
+        if (!/^lovelace\.\d+$/.test(instance)) {
+            return null;
+        }
 
         const exposed = ['system.', 'flow.', 'dashboard.', 'view.', 'statistics.', 'controls.', 'devices.', 'custom.'];
-        if (!exposed.some((prefix) => objectId.startsWith(prefix))) return null;
+        if (!exposed.some((prefix) => objectId.startsWith(prefix))) {
+            return null;
+        }
         // Read-only device values stay in ioBroker (there are hundreds); writable ones are needed by the control card.
         if (
             !writable &&
@@ -711,7 +749,9 @@ class VictronAdapter extends utils.Adapter {
         ) {
             return null;
         }
-        if (objectId === 'statistics.storage_json') return null;
+        if (objectId === 'statistics.storage_json') {
+            return null;
+        }
         if (writable) {
             // Writes from Lovelace go through the same checks (allowWrites, ranges) as every other write.
             const name = this.sanitizeLovelaceEntityName(`${this.namespace}_${objectId.replace(/\./g, '_')}`);
@@ -729,7 +769,9 @@ class VictronAdapter extends utils.Adapter {
             : definition.boolean
               ? 'boolean'
               : 'number';
-        if (!['number', 'string', 'boolean'].includes(ioBrokerType)) return null;
+        if (!['number', 'string', 'boolean'].includes(ioBrokerType)) {
+            return null;
+        }
 
         const name = this.sanitizeLovelaceEntityName(`${this.namespace}_${objectId.replace(/\./g, '_')}`);
         return {
@@ -744,10 +786,18 @@ class VictronAdapter extends utils.Adapter {
     async ensureStateObject(objectId, definition, writable, native = {}) {
         const common = stateCommon(definition, writable);
         if (writable && common.type === 'number') {
-            if (definition.unit === 'W' && common.min === undefined) common.min = this.config.writeSafetyMinW;
-            if (definition.unit === 'W' && common.max === undefined) common.max = this.config.writeSafetyMaxW;
-            if (definition.unit === '%' && common.min === undefined) common.min = 0;
-            if (definition.unit === '%' && common.max === undefined) common.max = 100;
+            if (definition.unit === 'W' && common.min === undefined) {
+                common.min = this.config.writeSafetyMinW;
+            }
+            if (definition.unit === 'W' && common.max === undefined) {
+                common.max = this.config.writeSafetyMaxW;
+            }
+            if (definition.unit === '%' && common.min === undefined) {
+                common.min = 0;
+            }
+            if (definition.unit === '%' && common.max === undefined) {
+                common.max = 100;
+            }
         }
         const lovelaceCustom = this.buildLovelaceCustom(objectId, definition, writable, common);
         if (lovelaceCustom) {
@@ -795,7 +845,9 @@ class VictronAdapter extends utils.Adapter {
                 type: definition.type,
                 scale: definition.scale
             });
-            if (definition.write) await this.registerWritableState(objectId, this.config.unitIdSystem, definition);
+            if (definition.write) {
+                await this.registerWritableState(objectId, this.config.unitIdSystem, definition);
+            }
         }
     }
 
@@ -1202,8 +1254,12 @@ class VictronAdapter extends utils.Adapter {
 
     async createControlObjects() {
         for (const definition of CONTROL_REGISTERS) {
-            if (definition.requiresNewSetpoint && !this.config.useNewSetpoint) continue;
-            if (definition.requiresLegacySetpoint && !this.config.legacySetpointEnabled) continue;
+            if (definition.requiresNewSetpoint && !this.config.useNewSetpoint) {
+                continue;
+            }
+            if (definition.requiresLegacySetpoint && !this.config.legacySetpointEnabled) {
+                continue;
+            }
 
             const objectId = `controls.${definition.id}`;
             await this.ensureStateObject(objectId, definition, Boolean(definition.write), {
@@ -1213,7 +1269,9 @@ class VictronAdapter extends utils.Adapter {
                 scale: definition.scale,
                 rawScaleForWrite: definition.rawScaleForWrite
             });
-            if (definition.write) await this.registerWritableState(objectId, this.config.controlUnitId, definition);
+            if (definition.write) {
+                await this.registerWritableState(objectId, this.config.controlUnitId, definition);
+            }
         }
     }
 
@@ -1230,7 +1288,9 @@ class VictronAdapter extends utils.Adapter {
                 this.log.info(`Removed custom register state ${id} (no longer configured)`);
             }
         }
-        if (!this.customRegisters.length) return;
+        if (!this.customRegisters.length) {
+            return;
+        }
 
         await this.ensureChannelObject(
             'custom',
@@ -1246,7 +1306,9 @@ class VictronAdapter extends utils.Adapter {
                 scale: definition.scale,
                 custom: true
             });
-            if (definition.write) await this.registerWritableState(objectId, definition.unitId, definition);
+            if (definition.write) {
+                await this.registerWritableState(objectId, definition.unitId, definition);
+            }
         }
     }
 
@@ -1267,14 +1329,18 @@ class VictronAdapter extends utils.Adapter {
     }
 
     async pollOnce() {
-        if (this.isStopping || this.isPolling || !this.client) return;
+        if (this.isStopping || this.isPolling || !this.client) {
+            return;
+        }
         this.isPolling = true;
         let successCount = 0;
         try {
             try {
                 await this.client.connect();
             } catch (error) {
-                if (this.isStopping) return;
+                if (this.isStopping) {
+                    return;
+                }
                 await this.safeSetStateAsync('info.connection', false, true);
                 await this.safeSetStateAsync(
                     'status.lastError',
@@ -1285,22 +1351,34 @@ class VictronAdapter extends utils.Adapter {
                 return;
             }
 
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
             this.lastValues.clear();
 
             successCount += await this.readDefinitions(this.config.unitIdSystem, SYSTEM_REGISTERS, 'system');
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
 
             const activeControls = CONTROL_REGISTERS.filter((definition) => {
-                if (definition.requiresNewSetpoint && !this.config.useNewSetpoint) return false;
-                if (definition.requiresLegacySetpoint && !this.config.legacySetpointEnabled) return false;
+                if (definition.requiresNewSetpoint && !this.config.useNewSetpoint) {
+                    return false;
+                }
+                if (definition.requiresLegacySetpoint && !this.config.legacySetpointEnabled) {
+                    return false;
+                }
                 return true;
             });
             successCount += await this.readDefinitions(this.config.controlUnitId, activeControls, 'controls');
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
 
             for (const device of this.discoveredDevices.values()) {
-                if (this.isStopping) return;
+                if (this.isStopping) {
+                    return;
+                }
                 successCount += await this.readDefinitions(
                     device.unitId,
                     device.profile.registers,
@@ -1310,17 +1388,25 @@ class VictronAdapter extends utils.Adapter {
 
             const customByUnit = new Map();
             for (const definition of this.customRegisters) {
-                if (!customByUnit.has(definition.unitId)) customByUnit.set(definition.unitId, []);
+                if (!customByUnit.has(definition.unitId)) {
+                    customByUnit.set(definition.unitId, []);
+                }
                 customByUnit.get(definition.unitId).push(definition);
             }
             for (const [unitId, definitions] of customByUnit) {
-                if (this.isStopping) return;
+                if (this.isStopping) {
+                    return;
+                }
                 successCount += await this.readDefinitions(unitId, definitions, 'custom');
             }
 
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
             await this.updateFlowStates();
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
 
             const connected = successCount > 0;
             await this.safeSetStateAsync('info.connection', connected, true);
@@ -1344,12 +1430,18 @@ class VictronAdapter extends utils.Adapter {
     }
 
     async readDefinitions(unitId, definitions, prefix) {
-        if (this.isStopping) return 0;
+        if (this.isStopping) {
+            return 0;
+        }
         let count = 0;
         for (const group of this.groupDefinitions(definitions)) {
-            if (this.isStopping) break;
+            if (this.isStopping) {
+                break;
+            }
             if (group.length === 1) {
-                if (await this.readDefinition(unitId, group[0], `${prefix}.${group[0].id}`)) count++;
+                if (await this.readDefinition(unitId, group[0], `${prefix}.${group[0].id}`)) {
+                    count++;
+                }
                 continue;
             }
             const groupCount = await this.readDefinitionGroup(unitId, group, prefix);
@@ -1374,12 +1466,16 @@ class VictronAdapter extends utils.Adapter {
                 end = definition.address + length;
             }
         }
-        if (group.length) groups.push(group);
+        if (group.length) {
+            groups.push(group);
+        }
         return groups;
     }
 
     async readDefinitionGroup(unitId, group, prefix) {
-        if (this.isStopping) return 0;
+        if (this.isStopping) {
+            return 0;
+        }
         const start = group[0].address;
         const end = group.reduce(
             (max, definition) => Math.max(max, definition.address + getRegisterLength(definition.type)),
@@ -1390,7 +1486,9 @@ class VictronAdapter extends utils.Adapter {
             const registers = await this.client.readHoldingRegisters(unitId, start, quantity);
             let count = 0;
             for (const definition of group) {
-                if (this.isStopping) return count;
+                if (this.isStopping) {
+                    return count;
+                }
                 const offset = definition.address - start;
                 const length = getRegisterLength(definition.type);
                 const slice = registers.slice(offset, offset + length);
@@ -1415,22 +1513,30 @@ class VictronAdapter extends utils.Adapter {
             );
             let count = 0;
             for (const definition of group) {
-                if (this.isStopping) break;
-                if (await this.readDefinition(unitId, definition, `${prefix}.${definition.id}`)) count++;
+                if (this.isStopping) {
+                    break;
+                }
+                if (await this.readDefinition(unitId, definition, `${prefix}.${definition.id}`)) {
+                    count++;
+                }
             }
             return count;
         }
     }
 
     async readDefinition(unitId, definition, objectId) {
-        if (this.isStopping) return false;
+        if (this.isStopping) {
+            return false;
+        }
         try {
             const registers = await this.client.readHoldingRegisters(
                 unitId,
                 definition.address,
                 getRegisterLength(definition.type)
             );
-            if (this.isStopping) return false;
+            if (this.isStopping) {
+                return false;
+            }
             const value = decodeRegisters(registers, definition.type, definition.scale, definition.boolean);
             if (value !== null && value !== undefined) {
                 await this.safeSetStateAsync(objectId, value, true);
@@ -1454,7 +1560,9 @@ class VictronAdapter extends utils.Adapter {
         const first = (...ids) => {
             for (const id of ids) {
                 const v = value(id);
-                if (Number.isFinite(v)) return v;
+                if (Number.isFinite(v)) {
+                    return v;
+                }
             }
             return undefined;
         };
@@ -1471,7 +1579,9 @@ class VictronAdapter extends utils.Adapter {
             return found ? total : undefined;
         };
         const setFlow = async (id, val) => {
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
             if (Number.isFinite(val)) {
                 await this.safeSetStateAsync(`flow.${id}`, Number.isInteger(val) ? val : Number(val.toFixed(3)), true);
             } else {
@@ -1505,24 +1615,33 @@ class VictronAdapter extends utils.Adapter {
         // Fall back to the total AC consumption phases for essential loads and derive the other side if possible.
         const deriveRemainder = (total, part) =>
             Number.isFinite(total) && Number.isFinite(part) ? Math.max(0, total - part) : undefined;
-        if (!Number.isFinite(criticalL1))
+        if (!Number.isFinite(criticalL1)) {
             criticalL1 =
                 Number.isFinite(acConsumptionL1) && Number.isFinite(nonCriticalL1)
                     ? Math.max(0, acConsumptionL1 - nonCriticalL1)
                     : acConsumptionL1;
-        if (!Number.isFinite(criticalL2))
+        }
+        if (!Number.isFinite(criticalL2)) {
             criticalL2 =
                 Number.isFinite(acConsumptionL2) && Number.isFinite(nonCriticalL2)
                     ? Math.max(0, acConsumptionL2 - nonCriticalL2)
                     : acConsumptionL2;
-        if (!Number.isFinite(criticalL3))
+        }
+        if (!Number.isFinite(criticalL3)) {
             criticalL3 =
                 Number.isFinite(acConsumptionL3) && Number.isFinite(nonCriticalL3)
                     ? Math.max(0, acConsumptionL3 - nonCriticalL3)
                     : acConsumptionL3;
-        if (!Number.isFinite(nonCriticalL1)) nonCriticalL1 = deriveRemainder(acConsumptionL1, criticalL1);
-        if (!Number.isFinite(nonCriticalL2)) nonCriticalL2 = deriveRemainder(acConsumptionL2, criticalL2);
-        if (!Number.isFinite(nonCriticalL3)) nonCriticalL3 = deriveRemainder(acConsumptionL3, criticalL3);
+        }
+        if (!Number.isFinite(nonCriticalL1)) {
+            nonCriticalL1 = deriveRemainder(acConsumptionL1, criticalL1);
+        }
+        if (!Number.isFinite(nonCriticalL2)) {
+            nonCriticalL2 = deriveRemainder(acConsumptionL2, criticalL2);
+        }
+        if (!Number.isFinite(nonCriticalL3)) {
+            nonCriticalL3 = deriveRemainder(acConsumptionL3, criticalL3);
+        }
 
         const criticalLoads = [criticalL1, criticalL2, criticalL3].filter(Number.isFinite).reduce((a, b) => a + b, 0);
         const criticalLoadsFound = [criticalL1, criticalL2, criticalL3].some(Number.isFinite);
@@ -1690,7 +1809,9 @@ class VictronAdapter extends utils.Adapter {
         await setFlow('genset_total', gensetTotal);
         await setFlow('inverter_charger_power', inverterChargerPower);
 
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         await this.updateDashboardSnapshot({
             gridTotal,
             gridL1: first('grid_l1_32', 'grid_l1'),
@@ -1727,10 +1848,16 @@ class VictronAdapter extends utils.Adapter {
         const values = new Map();
         for (const [key, val] of this.lastValues.entries()) {
             const match = String(key).match(/^devices\.unit_(\d+)\.([^.]+)\.(.+)$/);
-            if (!match) continue;
+            if (!match) {
+                continue;
+            }
             const [, unit, profile, stateId] = match;
-            if (profile !== profileKey || !wanted.has(stateId)) continue;
-            if (!Number.isFinite(val)) continue;
+            if (profile !== profileKey || !wanted.has(stateId)) {
+                continue;
+            }
+            if (!Number.isFinite(val)) {
+                continue;
+            }
             const sortIndex = ids.indexOf(stateId);
             const existing = values.get(unit);
             if (!existing || sortIndex < existing.sortIndex) {
@@ -1742,7 +1869,9 @@ class VictronAdapter extends utils.Adapter {
 
     _sumDeviceFirst(profileKey, ...candidateIds) {
         const values = this._deviceValuesByUnit(profileKey, candidateIds);
-        if (!values.length) return undefined;
+        if (!values.length) {
+            return undefined;
+        }
         return values.reduce((sum, val) => sum + val, 0);
     }
 
@@ -1752,18 +1881,24 @@ class VictronAdapter extends utils.Adapter {
     }
 
     _roundForSnapshot(value) {
-        if (!Number.isFinite(value)) return null;
+        if (!Number.isFinite(value)) {
+            return null;
+        }
         return Number.isInteger(value) ? value : Number(value.toFixed(3));
     }
 
     _deadband(value, threshold = 0) {
-        if (!Number.isFinite(value)) return null;
+        if (!Number.isFinite(value)) {
+            return null;
+        }
         return Math.abs(value) <= threshold ? 0 : value;
     }
 
     _sumSnapshotValues(...values) {
         const finite = values.filter(Number.isFinite);
-        if (!finite.length) return null;
+        if (!finite.length) {
+            return null;
+        }
         return finite.reduce((sum, val) => sum + val, 0);
     }
 
@@ -1921,13 +2056,21 @@ class VictronAdapter extends utils.Adapter {
             sources: this.currentLoadSourceInfo || {}
         };
 
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         await this.updateViewStates(snapshot);
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
 
         const setDashboard = async (id, value) => {
-            if (this.isStopping) return;
-            if (value === undefined) value = null;
+            if (this.isStopping) {
+                return;
+            }
+            if (value === undefined) {
+                value = null;
+            }
             await this.safeSetStateAsync(`dashboard.${id}`, value, true);
         };
 
@@ -1970,7 +2113,9 @@ class VictronAdapter extends utils.Adapter {
 
     async updateViewStates(snapshot) {
         const ui = snapshot && snapshot.ui ? snapshot.ui : null;
-        if (!ui) return;
+        if (!ui) {
+            return;
+        }
 
         // In 0.3.3 this function returned early when the visible values were equal.
         // That is bad for Lovelace custom cards because they only receive a new hass update
@@ -1996,8 +2141,12 @@ class VictronAdapter extends utils.Adapter {
         };
 
         const setView = async (id, value) => {
-            if (this.isStopping) return;
-            if (value === undefined) value = null;
+            if (this.isStopping) {
+                return;
+            }
+            if (value === undefined) {
+                value = null;
+            }
             await this.safeSetStateAsync(`view.${id}`, value, true);
         };
 
@@ -2046,7 +2195,9 @@ class VictronAdapter extends utils.Adapter {
     }
 
     async scanDevices() {
-        if (this.isStopping || this.isScanning || !this.client) return;
+        if (this.isStopping || this.isScanning || !this.client) {
+            return;
+        }
         this.isScanning = true;
         const started = Date.now();
         let checkedUnits = 0;
@@ -2056,7 +2207,9 @@ class VictronAdapter extends utils.Adapter {
             this.log.debug(`Device scan started: checking ${candidates.length} Unit-ID(s): ${candidates.join(', ')}`);
 
             for (const unitId of candidates) {
-                if (this.isStopping) break;
+                if (this.isStopping) {
+                    break;
+                }
                 checkedUnits++;
                 const unitStarted = Date.now();
                 let foundForUnit = 0;
@@ -2065,16 +2218,24 @@ class VictronAdapter extends utils.Adapter {
 
                 try {
                     for (const profile of DEVICE_PROFILES) {
-                        if (this.isStopping) break;
+                        if (this.isStopping) {
+                            break;
+                        }
                         const key = `${unitId}.${profile.key}`;
-                        if (this.discoveredDevices.has(key)) continue;
+                        if (this.discoveredDevices.has(key)) {
+                            continue;
+                        }
 
                         const result = await this.probeProfile(unitId, profile);
-                        if (this.isStopping) break;
+                        if (this.isStopping) {
+                            break;
+                        }
 
                         if (result.detected) {
                             await this.createDeviceProfile(unitId, profile);
-                            if (this.isStopping) break;
+                            if (this.isStopping) {
+                                break;
+                            }
                             this.discoveredDevices.set(key, { unitId, profile });
                             added++;
                             foundForUnit++;
@@ -2093,14 +2254,18 @@ class VictronAdapter extends utils.Adapter {
                         }
                     }
                 } catch (error) {
-                    if (this.isShutdownError(error)) break;
+                    if (this.isShutdownError(error)) {
+                        break;
+                    }
                     errors.push(`unexpected: ${this.formatScanError(error)}`);
                     this.log.debug(
                         `Scan Unit-ID ${unitId}: unexpected error ${this.formatScanError(error)}; continuing with next Unit-ID`
                     );
                 }
 
-                if (this.isStopping) break;
+                if (this.isStopping) {
+                    break;
+                }
                 if (foundForUnit > 0) {
                     this.log.debug(
                         `Scan Unit-ID ${unitId}: finished, detected ${foundForUnit} profile(s) in ${Date.now() - unitStarted} ms`
@@ -2148,14 +2313,22 @@ class VictronAdapter extends utils.Adapter {
         const ids = new Set();
         const add = (entry) => {
             const n = Number(String(entry).trim());
-            if (Number.isInteger(n) && n >= 0 && n <= 255) ids.add(n);
+            if (Number.isInteger(n) && n >= 0 && n <= 255) {
+                ids.add(n);
+            }
         };
 
-        for (const entry of String(value || fallback).split(',')) add(entry);
-        for (const entry of extraIds || []) add(entry);
+        for (const entry of String(value || fallback).split(',')) {
+            add(entry);
+        }
+        for (const entry of extraIds || []) {
+            add(entry);
+        }
 
         if (!ids.size) {
-            for (const entry of String(fallback).split(',')) add(entry);
+            for (const entry of String(fallback).split(',')) {
+                add(entry);
+            }
         }
 
         return Array.from(ids)
@@ -2167,7 +2340,9 @@ class VictronAdapter extends utils.Adapter {
         const ids = new Set();
         for (const entry of String(value || '').split(',')) {
             const n = Number(String(entry).trim());
-            if (Number.isInteger(n) && n >= 0 && n <= 255) ids.add(n);
+            if (Number.isInteger(n) && n >= 0 && n <= 255) {
+                ids.add(n);
+            }
         }
         ids.add(this.config.unitIdSystem);
         ids.add(this.config.controlUnitId);
@@ -2181,7 +2356,9 @@ class VictronAdapter extends utils.Adapter {
     }
 
     async probeProfile(unitId, profile) {
-        if (this.isStopping) return { detected: false, stopped: true };
+        if (this.isStopping) {
+            return { detected: false, stopped: true };
+        }
         try {
             const probe = profile.probe;
             await this.client.readHoldingRegisters(unitId, probe.address, getRegisterLength(probe.type));
@@ -2192,7 +2369,9 @@ class VictronAdapter extends utils.Adapter {
     }
 
     async createDeviceProfile(unitId, profile) {
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         const unitChannel = `devices.unit_${unitId}`;
         const profileChannel = `${unitChannel}.${profile.key}`;
         await this.ensureChannelObject(
@@ -2204,7 +2383,9 @@ class VictronAdapter extends utils.Adapter {
             ),
             { unitId }
         );
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         await this.ensureChannelObject(
             profileChannel,
             profile.name,
@@ -2215,7 +2396,9 @@ class VictronAdapter extends utils.Adapter {
             { unitId, profile: profile.key }
         );
         for (const definition of profile.registers) {
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
             const objectId = `${profileChannel}.${definition.id}`;
             await this.ensureStateObject(objectId, definition, Boolean(definition.write), {
                 unitId,
@@ -2223,7 +2406,9 @@ class VictronAdapter extends utils.Adapter {
                 type: definition.type,
                 scale: definition.scale
             });
-            if (definition.write) await this.registerWritableState(objectId, unitId, definition);
+            if (definition.write) {
+                await this.registerWritableState(objectId, unitId, definition);
+            }
         }
     }
 
@@ -2232,9 +2417,13 @@ class VictronAdapter extends utils.Adapter {
             this.applyForecast(state);
             return;
         }
-        if (!state || state.ack) return;
+        if (!state || state.ack) {
+            return;
+        }
         const entry = this.writableStates.get(id);
-        if (!entry) return;
+        if (!entry) {
+            return;
+        }
 
         // Make sure the next poll writes the real device value again (with ack=true),
         // even if it did not change, so a rejected command does not stay visible.
@@ -2254,8 +2443,8 @@ class VictronAdapter extends utils.Adapter {
     /**
      * Writes a value to the Modbus register behind a writable state.
      *
-     * @param {{objectId: string, unitId: number, definition: any}} entry writable state entry
-     * @param {any} value value written by the user (scaled, as shown in ioBroker)
+     * @param {{objectId: string, unitId: number, definition: Record<string, unknown>}} entry writable state entry
+     * @param {unknown} value value written by the user (scaled, as shown in ioBroker)
      */
     async handleWrite(entry, value) {
         const { objectId, unitId, definition } = entry;
@@ -2266,15 +2455,21 @@ class VictronAdapter extends utils.Adapter {
             await this.safeSetStateAsync('status.lastError', `Write blocked: writing is disabled (${objectId})`, true);
             return;
         }
-        if (!this.client) throw new Error('Modbus client not available');
+        if (!this.client) {
+            throw new Error('Modbus client not available');
+        }
 
         if (!definition.boolean) {
             const numeric = Number(value);
-            if (!Number.isFinite(numeric)) throw new Error(`Value '${value}' is not numeric`);
-            if (typeof definition.min === 'number' && numeric < definition.min)
+            if (!Number.isFinite(numeric)) {
+                throw new Error(`Value '${value}' is not numeric`);
+            }
+            if (typeof definition.min === 'number' && numeric < definition.min) {
                 throw new Error(`Value ${numeric} is below minimum ${definition.min}`);
-            if (typeof definition.max === 'number' && numeric > definition.max)
+            }
+            if (typeof definition.max === 'number' && numeric > definition.max) {
                 throw new Error(`Value ${numeric} is above maximum ${definition.max}`);
+            }
             if (
                 definition.unit === 'W' &&
                 (numeric < this.config.writeSafetyMinW || numeric > this.config.writeSafetyMaxW)
@@ -2464,10 +2659,12 @@ class VictronAdapter extends utils.Adapter {
     }
 
     /**
-     * @param {any} snapshot dashboard snapshot of the current poll
+     * @param {object} snapshot dashboard snapshot of the current poll
      */
     async updateStatistics(snapshot) {
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         const now = Number.isFinite(snapshot.timestampMs) ? snapshot.timestampMs : Date.now();
         const newDay = this.stats.update(
             {
@@ -2481,7 +2678,9 @@ class VictronAdapter extends utils.Adapter {
             now
         );
         // Statistics change slowly: write them once per minute (and immediately after midnight).
-        if (!newDay && now - this.lastStatsWrite < 60000) return;
+        if (!newDay && now - this.lastStatsWrite < 60000) {
+            return;
+        }
         this.lastStatsWrite = now;
         await this.writeStatistics();
         if (newDay || now - this.lastStatsPersist >= 5 * 60000) {
@@ -2538,22 +2737,30 @@ class VictronAdapter extends utils.Adapter {
     }
 
     async syncVrm() {
-        if (this.isStopping || this.vrmBusy) return;
+        if (this.isStopping || this.vrmBusy) {
+            return;
+        }
         this.vrmBusy = true;
         try {
             const fullImport = this.stats.history.length < 300 && !this.vrmFullDone;
             const days = fullImport ? 400 : 4;
             const result = await fetchVrmDays({ token: this.config.vrmToken, siteId: this.config.vrmSiteId, days });
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
             const count = this.stats.importDays(result, Date.now());
-            if (fullImport) this.vrmFullDone = true;
+            if (fullImport) {
+                this.vrmFullDone = true;
+            }
             await this.writeStatistics();
             await this.safeSetStateAsync('statistics.storage_json', JSON.stringify(this.stats.toJSON()), true);
             await this.safeSetStateAsync('statistics.vrm_status', `OK – ${count} days imported`, true);
             await this.safeSetStateAsync('statistics.vrm_last_sync', new Date().toISOString(), true);
             this.log.info(`VRM import: ${count} days imported (${days} days requested)`);
         } catch (error) {
-            if (this.isStopping) return;
+            if (this.isStopping) {
+                return;
+            }
             this.log.warn(`VRM import failed: ${error.message}`);
             await this.safeSetStateAsync('statistics.vrm_status', `Error: ${error.message}`, true);
         } finally {
@@ -2567,7 +2774,9 @@ class VictronAdapter extends utils.Adapter {
 
     async setupForecast() {
         const id = this.config.forecastTodayStateId;
-        if (!id) return;
+        if (!id) {
+            return;
+        }
         try {
             await this.subscribeForeignStatesAsync(id);
             const state = await this.getForeignStateAsync(id);
@@ -2579,7 +2788,7 @@ class VictronAdapter extends utils.Adapter {
     }
 
     /**
-     * @param {any} state forecast state
+     * @param {ioBroker.State | null | undefined} state forecast state
      */
     applyForecast(state) {
         const value = state ? Number(state.val) : NaN;
@@ -2598,11 +2807,15 @@ class VictronAdapter extends utils.Adapter {
         const alarms = [];
         for (const [key, value] of this.lastValues.entries()) {
             const match = String(key).match(/^devices\.unit_(\d+)\.([^.]+)\.(.+)$/);
-            if (!match || !Number.isFinite(value) || value <= 0) continue;
+            if (!match || !Number.isFinite(value) || value <= 0) {
+                continue;
+            }
             const [, unit, profileKey, stateId] = match;
             const isAlarm = /alarm$/.test(stateId) && !/alarms$/.test(stateId);
             const isError = /^(error_code|ve_bus_error)$/.test(stateId);
-            if (!isAlarm && !isError) continue;
+            if (!isAlarm && !isError) {
+                continue;
+            }
             const profile = DEVICE_PROFILES.find((entry) => entry.key === profileKey);
             const definition = profile && profile.registers.find((entry) => entry.id === stateId);
             alarms.push({
@@ -2618,10 +2831,12 @@ class VictronAdapter extends utils.Adapter {
     }
 
     /**
-     * @param {any} snapshot dashboard snapshot of the current poll
+     * @param {object} snapshot dashboard snapshot of the current poll
      */
     async updateDashboardExtras(snapshot) {
-        if (this.isStopping) return;
+        if (this.isStopping) {
+            return;
+        }
         const alarms = this.collectAlarms();
         const level = alarms.reduce((max, alarm) => Math.max(max, alarm.level), 0);
         await this.safeSetStateAsync('dashboard.alarm_count', alarms.length, true);
@@ -2677,15 +2892,19 @@ class VictronAdapter extends utils.Adapter {
             this.isStopping = true;
             this.clearTimer('pollTimer');
             this.clearTimer('scanTimer');
-            if (this.vrmTimer) this.clearTimeout(this.vrmTimer);
-            if (this.vrmInterval) this.clearInterval(this.vrmInterval);
+            if (this.vrmTimer) {
+                this.clearTimeout(this.vrmTimer);
+            }
+            if (this.vrmInterval) {
+                this.clearInterval(this.vrmInterval);
+            }
             if (this.client) {
                 this.client.destroy();
                 this.client = null;
             }
             this.log.debug('Adapter unload requested: active polls/scans will stop without further state writes.');
             callback();
-        } catch (error) {
+        } catch {
             callback();
         }
     }
