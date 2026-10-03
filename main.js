@@ -3,7 +3,10 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const utils = require('@iobroker/adapter-core');
+const ioPackage = require('./io-package.json');
 const { ModbusTcpClient } = require('./lib/modbusClient');
+const { EnergyStatistics, ENERGY_KEYS } = require('./lib/statistics');
+const { fetchVrmDays } = require('./lib/vrm');
 const {
     SYSTEM_REGISTERS,
     FLOW_STATES,
@@ -15,7 +18,72 @@ const {
     stateCommon
 } = require('./lib/registerMap');
 
-class VictronHouseControl extends utils.Adapter {
+const ADAPTER_VERSION = ioPackage.common.version;
+const CUSTOM_REGISTER_TYPES = ['uint16', 'int16', 'uint32', 'int32'];
+
+/**
+ * Builds a translated text object for object names and descriptions.
+ *
+ * @param {string} en English text
+ * @param {string} de German text
+ */
+function t(en, de) {
+    return { en, de };
+}
+
+const LIVE_NAMES_EN = {
+    last_update_ms: 'Dashboard update timestamp',
+    grid_total: 'Grid power total',
+    grid_flow: 'Grid flow direction',
+    grid_status: 'Grid status',
+    pv_total: 'PV total',
+    pv_ac: 'PV AC',
+    pv_dc: 'PV DC',
+    house_total: 'House consumption total',
+    ac_loads_total: 'AC loads total',
+    essential_loads_total: 'Essential loads total',
+    battery_soc: 'Battery state of charge',
+    battery_power: 'Battery power',
+    battery_flow: 'Battery flow direction',
+    battery_voltage: 'Battery voltage',
+    battery_current: 'Battery current',
+    battery_temperature: 'Battery temperature',
+    battery_status: 'Battery status',
+    surplus: 'PV surplus',
+    ev_power: 'EV charger power',
+    alarm_count: 'Number of active alarms',
+    alarm_level: 'Alarm level',
+    alarms_json: 'Active alarms',
+    battery_time_to_full_min: 'Battery full in',
+    battery_time_to_go_min: 'Battery time to go',
+    battery_capacity_kwh: 'Battery capacity',
+    battery_soh: 'Battery state of health',
+    battery_cycles: 'Battery charge cycles',
+    pv_forecast_today_kwh: 'PV forecast today'
+};
+
+/**
+ * English name for the calculated live values in dashboard.* and view.*.
+ *
+ * @param {string} id state id without channel
+ */
+function liveNameEn(id) {
+    if (LIVE_NAMES_EN[id]) return LIVE_NAMES_EN[id];
+    const phase = id.match(/^(.*)_l([123])$/);
+    if (phase) {
+        const base = {
+            grid: 'Grid power',
+            pv_ac: 'PV AC',
+            house: 'House consumption',
+            ac_loads: 'AC loads',
+            essential_loads: 'Essential loads'
+        }[phase[1]];
+        if (base) return `${base} L${phase[2]}`;
+    }
+    return id.replace(/_/g, ' ');
+}
+
+class VictronAdapter extends utils.Adapter {
     constructor(options = {}) {
         super({
             ...options,
@@ -28,14 +96,19 @@ class VictronHouseControl extends utils.Adapter {
         this.isPolling = false;
         this.isScanning = false;
         this.discoveredDevices = new Map();
-        this.controlByStateId = new Map();
-        this.rawPrefix = 'raw.write';
+        this.writableStates = new Map();
+        this.customRegisters = [];
         this.lastValues = new Map();
+        this.stateCache = new Map();
+        this.stats = new EnergyStatistics();
+        this.lastStatsWrite = 0;
+        this.lastStatsPersist = 0;
+        this.forecastTodayKwh = null;
         this.isStopping = false;
 
         this.on('ready', () => this.onReady());
         this.on('stateChange', (id, state) => this.onStateChange(id, state));
-        this.on('unload', callback => this.onUnload(callback));
+        this.on('unload', (callback) => this.onUnload(callback));
     }
 
     async onReady() {
@@ -54,14 +127,14 @@ class VictronHouseControl extends utils.Adapter {
             await this.createFlowObjects();
             await this.createDashboardObjects();
             await this.createViewObjects();
+            await this.createStatisticsObjects();
+            await this.restoreStatistics();
+            await this.setupForecast();
+            this.setupVrmSync();
             await this.createControlObjects();
-            if (this.config.autoCreateRawWriteObjects) {
-                await this.createRawWriteObjects();
-            }
+            await this.createCustomRegisterObjects();
+            await this.removeLegacyRawObjects();
             await this.installLovelaceCard();
-
-            this.subscribeStates('controls.*');
-            this.subscribeStates(`${this.rawPrefix}.*`);
 
             await this.pollOnce();
             this.schedulePolling();
@@ -72,7 +145,9 @@ class VictronHouseControl extends utils.Adapter {
             }
         } catch (error) {
             this.log.error(`Startup failed: ${error.message}`);
-            this.schedulePolling();
+            await this.safeSetStateAsync('info.connection', false, true).catch(() => undefined);
+            // Only keep polling when the configuration itself was valid and a client exists.
+            if (this.client) this.schedulePolling();
         }
     }
 
@@ -85,13 +160,10 @@ class VictronHouseControl extends utils.Adapter {
         cfg.port = Number(cfg.port || 502);
         cfg.timeout = Number(cfg.timeout || 3000);
         cfg.pollInterval = Number(cfg.pollInterval || 2000);
-        if (cfg.pollInterval === 5000) {
-            cfg.pollInterval = 2000;
-            this.log.info('Old default poll interval 5000 ms detected; optimized to 2000 ms for the Lovelace live dashboard.');
-        }
         cfg.unitIdSystem = Number(cfg.unitIdSystem || 100);
         cfg.controlUnitId = Number(cfg.controlUnitId || cfg.unitIdSystem || 100);
-        const defaultScanUnitIds = '100,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247';
+        const defaultScanUnitIds =
+            '100,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247';
         if (!cfg.scanUnitIds) {
             if (cfg.scanFrom || cfg.scanTo) {
                 const from = Math.max(1, Math.min(255, Number(cfg.scanFrom || 223)));
@@ -103,13 +175,28 @@ class VictronHouseControl extends utils.Adapter {
                 cfg.scanUnitIds = defaultScanUnitIds;
             }
         }
-        cfg.scanUnitIds = this.normalizeUnitIdList(cfg.scanUnitIds, [cfg.unitIdSystem, cfg.controlUnitId], defaultScanUnitIds);
+        cfg.scanUnitIds = this.normalizeUnitIdList(
+            cfg.scanUnitIds,
+            [cfg.unitIdSystem, cfg.controlUnitId],
+            defaultScanUnitIds
+        );
         cfg.scanInterval = Number(cfg.scanInterval || 300000);
         cfg.writeSafetyMinW = Number(cfg.writeSafetyMinW ?? -30000);
         cfg.writeSafetyMaxW = Number(cfg.writeSafetyMaxW ?? 30000);
-        cfg.installLovelaceCard = cfg.installLovelaceCard !== false;
+        cfg.installLovelaceCard = cfg.installLovelaceCard === true;
         cfg.lovelaceInstance = String(cfg.lovelaceInstance || 'lovelace.0').trim() || 'lovelace.0';
-        cfg.restartLovelaceAfterCardInstall = cfg.restartLovelaceAfterCardInstall !== false;
+        cfg.allowWrites = cfg.allowWrites === true;
+        cfg.priceImport =
+            Number.isFinite(Number(cfg.priceImport)) && cfg.priceImport !== '' ? Number(cfg.priceImport) : 0.32;
+        cfg.priceExport =
+            Number.isFinite(Number(cfg.priceExport)) && cfg.priceExport !== '' ? Number(cfg.priceExport) : 0.08;
+        cfg.batteryCapacityKwh = Number(cfg.batteryCapacityKwh) > 0 ? Number(cfg.batteryCapacityKwh) : 0;
+        cfg.forecastTodayStateId = String(cfg.forecastTodayStateId || '').trim();
+        cfg.forecastUnit = cfg.forecastUnit === 'Wh' ? 'Wh' : 'kWh';
+        cfg.vrmEnabled = cfg.vrmEnabled === true;
+        cfg.vrmSiteId = String(cfg.vrmSiteId || '').trim();
+        cfg.vrmToken = String(cfg.vrmToken || '').trim();
+        this.customRegisters = this.normalizeCustomRegisters(cfg.customRegisters);
 
         if (trimmedHost && cleanedHost !== trimmedHost) {
             this.log.warn(`GX host/IP contained spaces and was normalized from '${trimmedHost}' to '${cleanedHost}'`);
@@ -130,6 +217,58 @@ class VictronHouseControl extends utils.Adapter {
             this.log.warn(`Invalid Lovelace instance '${cfg.lovelaceInstance}', using lovelace.0`);
             cfg.lovelaceInstance = 'lovelace.0';
         }
+    }
+
+    /**
+     * Validates the user defined register table from the admin UI.
+     *
+     * @param {any} rows table rows from the instance configuration
+     */
+    normalizeCustomRegisters(rows) {
+        const result = [];
+        const seen = new Set();
+        for (const row of Array.isArray(rows) ? rows : []) {
+            if (!row || row.enabled === false) continue;
+            const unitId = Number(row.unitId);
+            const address = Number(row.address);
+            const type = CUSTOM_REGISTER_TYPES.includes(row.type) ? row.type : 'uint16';
+            const scale = row.scale === undefined || row.scale === '' ? 1 : Number(row.scale);
+            if (!Number.isInteger(unitId) || unitId < 0 || unitId > 255) {
+                this.log.warn(`Custom register ignored: invalid Unit-ID '${row.unitId}'`);
+                continue;
+            }
+            if (!Number.isInteger(address) || address < 0 || address > 65535) {
+                this.log.warn(`Custom register ignored: invalid address '${row.address}'`);
+                continue;
+            }
+            if (!Number.isFinite(scale) || scale === 0) {
+                this.log.warn(`Custom register ${unitId}/${address} ignored: invalid scale '${row.scale}'`);
+                continue;
+            }
+            const id = `unit_${unitId}_reg_${address}`;
+            if (seen.has(id)) {
+                this.log.warn(`Custom register ${unitId}/${address} is configured twice; only the first entry is used`);
+                continue;
+            }
+            seen.add(id);
+            const label = String(row.name || '').trim() || `Unit ${unitId} register ${address}`;
+            const unit = String(row.unit || '').trim();
+            result.push({
+                id,
+                unitId,
+                name: label,
+                nameDe: label,
+                address,
+                type,
+                scale,
+                unit: unit || undefined,
+                role: row.writable ? (unit === 'W' ? 'level.power' : 'level') : unit === 'W' ? 'value.power' : 'value',
+                write: row.writable === true,
+                descriptionEn: `User defined register ${address} on Unit-ID ${unitId} (${type}, scale ${scale}).`,
+                descriptionDe: `Benutzerdefiniertes Register ${address} auf Unit-ID ${unitId} (${type}, Faktor ${scale}).`
+            });
+        }
+        return result;
     }
 
     schedulePolling() {
@@ -153,12 +292,19 @@ class VictronHouseControl extends utils.Adapter {
 
     isShutdownError(error) {
         const message = String(error && error.message ? error.message : error || '');
-        return this.isStopping || /DB closed|Connection is closed|Modbus connection closed|Adapter is stopping/i.test(message);
+        return (
+            this.isStopping ||
+            /DB closed|Connection is closed|Modbus connection closed|Adapter is stopping/i.test(message)
+        );
     }
 
     isUnitTimeoutError(error) {
         const message = String(error && error.message ? error.message : error || '');
-        return error && (error.code === 'TIMEOUT' || /timeout|timed out|connection closed|ECONNRESET|EHOSTUNREACH|ENETUNREACH|ECONNREFUSED/i.test(message));
+        return (
+            error &&
+            (error.code === 'TIMEOUT' ||
+                /timeout|timed out|connection closed|ECONNRESET|EHOSTUNREACH|ENETUNREACH|ECONNREFUSED/i.test(message))
+        );
     }
 
     formatScanError(error) {
@@ -169,8 +315,12 @@ class VictronHouseControl extends utils.Adapter {
 
     async safeSetStateAsync(id, value, ack = true) {
         if (this.isStopping) return false;
+        // Only write when the value changed. This keeps the load on the states DB and on
+        // history adapters low; live signals (timestamps, revision, JSON snapshots) change anyway.
+        if (ack && this.stateCache.has(id) && this.stateCache.get(id) === value) return true;
         try {
             await this.setStateAsync(id, value, ack);
+            if (ack) this.stateCache.set(id, value);
             return true;
         } catch (error) {
             if (this.isShutdownError(error)) {
@@ -207,304 +357,320 @@ class VictronHouseControl extends utils.Adapter {
     }
 
     async createBaseObjects() {
-        await this.ensureChannelObject('system', 'Victron Systemwerte', 'Direkt gelesene Systemwerte vom Cerbo/GX, zum Beispiel Netz, Batterie, PV und Hausverbrauch.');
-        await this.ensureChannelObject('flow', 'Energiefluss berechnet', 'Berechnete, gut verständliche Werte für Energiezentrale und Visualisierung.');
-        await this.ensureChannelObject('controls', 'ESS Steuerung', 'Schreibbare Steuerpunkte für ESS, Einspeisung, Batterie und Netz-Sollwerte. Schreiben muss in der Adapterkonfiguration freigegeben werden.');
-        await this.ensureChannelObject('devices', 'Gefundene Victron Geräte', 'Automatisch erkannte Victron-Dienste und Geräte über Modbus Unit-IDs.');
-        await this.ensureChannelObject('status', 'Adapterstatus', 'Statusinformationen zur Verbindung, Abfrage und Geräteerkennung.');
-        await this.ensureStateObject('status.lastPoll', { id: 'lastPoll', name: 'Letzte erfolgreiche Abfrage', description: 'Zeitpunkt der letzten erfolgreichen Datenabfrage.', type: 'string', role: 'date' }, false);
-        await this.ensureStateObject('status.lastError', { id: 'lastError', name: 'Letzter Fehler', description: 'Letzte Fehler- oder Warnmeldung des Adapters.', type: 'string', role: 'text' }, false);
-        await this.ensureStateObject('status.discoveredCount', { id: 'discoveredCount', name: 'Anzahl erkannter Geräteprofile', description: 'Anzahl automatisch erkannter Victron-Geräteprofile.', type: 'number', role: 'value' }, false);
-        await this.ensureChannelObject('lovelace', 'Lovelace Visualisierung', 'Status der automatisch installierten Victron-Energieflusskarte für ioBroker Lovelace.');
-        await this.ensureStateObject('lovelace.cardInstalled', { id: 'cardInstalled', name: 'Lovelace-Karte installiert', description: 'Zeigt an, ob die Victron-Energieflusskarte erfolgreich in die Lovelace-Instanz kopiert wurde.', type: 'boolean', role: 'indicator' }, false);
-        await this.ensureStateObject('lovelace.cardPath', { id: 'cardPath', name: 'Pfad der Lovelace-Karte', description: 'Zielpfad der installierten Custom Card in der Lovelace-Instanz.', type: 'string', role: 'text' }, false);
-        await this.ensureStateObject('lovelace.cardError', { id: 'cardError', name: 'Lovelace-Kartenfehler', description: 'Letzter Fehler bei Installation oder Aktualisierung der Lovelace-Karte.', type: 'string', role: 'text' }, false);
-        await this.ensureStateObject('lovelace.lastRestart', { id: 'lastRestart', name: 'Letzter Lovelace-Neustart', description: 'Zeitpunkt, an dem der Adapter die Lovelace-Instanz zuletzt wegen eines Kartenupdates neu gestartet hat.', type: 'string', role: 'date' }, false);
+        await this.ensureChannelObject(
+            'system',
+            t('Victron system values', 'Victron Systemwerte'),
+            t(
+                'Values read directly from the GX device (grid, battery, PV, consumption).',
+                'Direkt gelesene Systemwerte vom Cerbo/GX, zum Beispiel Netz, Batterie, PV und Hausverbrauch.'
+            )
+        );
+        await this.ensureChannelObject(
+            'flow',
+            t('Calculated energy flow', 'Energiefluss berechnet'),
+            t(
+                'Calculated values for energy dashboards and visualisation.',
+                'Berechnete, gut verständliche Werte für Energiezentrale und Visualisierung.'
+            )
+        );
+        await this.ensureChannelObject(
+            'controls',
+            t('ESS control', 'ESS Steuerung'),
+            t(
+                'Writable ESS settings. Writing must be enabled in the instance settings.',
+                'Schreibbare Steuerpunkte für ESS, Einspeisung, Batterie und Netz-Sollwerte. Schreiben muss in der Adapterkonfiguration freigegeben werden.'
+            )
+        );
+        await this.ensureChannelObject(
+            'devices',
+            t('Discovered Victron devices', 'Gefundene Victron Geräte'),
+            t(
+                'Victron services detected automatically via Modbus Unit-IDs.',
+                'Automatisch erkannte Victron-Dienste und Geräte über Modbus Unit-IDs.'
+            )
+        );
+        await this.ensureChannelObject(
+            'status',
+            t('Adapter status', 'Adapterstatus'),
+            t(
+                'Connection, polling and discovery status.',
+                'Statusinformationen zur Verbindung, Abfrage und Geräteerkennung.'
+            )
+        );
+        await this.ensureStateObject(
+            'status.lastPoll',
+            {
+                id: 'lastPoll',
+                nameEn: 'Last successful poll',
+                name: 'Letzte erfolgreiche Abfrage',
+                descriptionEn: 'Time of the last successful poll.',
+                description: 'Zeitpunkt der letzten erfolgreichen Datenabfrage.',
+                type: 'string',
+                role: 'date'
+            },
+            false
+        );
+        await this.ensureStateObject(
+            'status.lastError',
+            {
+                id: 'lastError',
+                nameEn: 'Last error',
+                name: 'Letzter Fehler',
+                descriptionEn: 'Last error or warning of the adapter.',
+                description: 'Letzte Fehler- oder Warnmeldung des Adapters.',
+                type: 'string',
+                role: 'text'
+            },
+            false
+        );
+        await this.ensureStateObject(
+            'status.discoveredCount',
+            {
+                id: 'discoveredCount',
+                nameEn: 'Number of discovered device profiles',
+                name: 'Anzahl erkannter Geräteprofile',
+                descriptionEn: 'Number of automatically detected Victron device profiles.',
+                description: 'Anzahl automatisch erkannter Victron-Geräteprofile.',
+                type: 'number',
+                role: 'value'
+            },
+            false
+        );
+        await this.ensureChannelObject(
+            'lovelace',
+            t('Lovelace visualisation', 'Lovelace Visualisierung'),
+            t(
+                'Status of the optional Victron energy flow card for ioBroker Lovelace.',
+                'Status der optionalen Victron-Energieflusskarte für ioBroker Lovelace.'
+            )
+        );
+        await this.ensureStateObject(
+            'lovelace.cardInstalled',
+            {
+                id: 'cardInstalled',
+                nameEn: 'Lovelace card installed',
+                name: 'Lovelace-Karte installiert',
+                descriptionEn: 'True when the card was copied into the Lovelace instance.',
+                description:
+                    'Zeigt an, ob die Victron-Energieflusskarte erfolgreich in die Lovelace-Instanz kopiert wurde.',
+                type: 'boolean',
+                role: 'indicator'
+            },
+            false
+        );
+        await this.ensureStateObject(
+            'lovelace.cardPath',
+            {
+                id: 'cardPath',
+                nameEn: 'Lovelace card path',
+                name: 'Pfad der Lovelace-Karte',
+                descriptionEn: 'Target path of the custom card in the Lovelace instance.',
+                description: 'Zielpfad der installierten Custom Card in der Lovelace-Instanz.',
+                type: 'string',
+                role: 'text'
+            },
+            false
+        );
+        await this.ensureStateObject(
+            'lovelace.cardError',
+            {
+                id: 'cardError',
+                nameEn: 'Lovelace card error',
+                name: 'Lovelace-Kartenfehler',
+                descriptionEn: 'Last error while installing or updating the Lovelace card.',
+                description: 'Letzter Fehler bei Installation oder Aktualisierung der Lovelace-Karte.',
+                type: 'string',
+                role: 'text'
+            },
+            false
+        );
+        // State of 0.6.x that is no longer used (the adapter does not restart Lovelace anymore).
+        await this.delObjectAsync('lovelace.lastRestart').catch(() => undefined);
     }
 
+    /**
+     * Copies the bundled Lovelace custom card and YAML examples into the file storage of the
+     * configured Lovelace instance. Only runs when the user enabled the option.
+     * The Lovelace instance is never restarted or modified otherwise; foreign files are not deleted.
+     */
     async installLovelaceCard() {
         if (!this.config.installLovelaceCard) {
-            await this.setStateAsync('lovelace.cardInstalled', false, true);
-            await this.setStateAsync('lovelace.cardError', 'Automatische Lovelace-Installation ist deaktiviert.', true);
+            await this.safeSetStateAsync('lovelace.cardInstalled', false, true);
+            await this.safeSetStateAsync('lovelace.cardError', '', true);
             return;
         }
 
         const instance = this.config.lovelaceInstance || 'lovelace.0';
-        const targetFiles = [
-            'cards/victronadapter-card.js'
-        ];
-        const yamlFiles = [
+        const files = [
+            'cards/victronadapter-card.js',
             'cards/victronadapter-flow.yaml',
-            'cards/victronadapter-flow-circle.yaml'
+            'cards/victronadapter-flow-circle.yaml',
+            'cards/victronadapter-flow-hub.yaml',
+            'cards/victronadapter-dashboard.yaml'
         ];
-        const statePath = [...targetFiles, ...yamlFiles].map(file => `/${instance}/${file}`).join(', ');
+        const statePath = files.map((file) => `/${instance}/${file}`).join(', ');
 
         try {
             const lovelaceObj = await this.getForeignObjectAsync(`system.adapter.${instance}`);
             if (!lovelaceObj) {
-                const msg = `Lovelace-Instanz ${instance} wurde nicht gefunden. Karte kann erst installiert werden, wenn der Lovelace-Adapter existiert.`;
-                await this.setStateAsync('lovelace.cardInstalled', false, true);
-                await this.setStateAsync('lovelace.cardPath', statePath, true);
-                await this.setStateAsync('lovelace.cardError', msg, true);
+                const msg = `Lovelace instance ${instance} not found. Install the Lovelace adapter first, then restart this instance.`;
+                await this.safeSetStateAsync('lovelace.cardInstalled', false, true);
+                await this.safeSetStateAsync('lovelace.cardPath', statePath, true);
+                await this.safeSetStateAsync('lovelace.cardError', msg, true);
                 this.log.warn(msg);
                 return;
             }
 
-            // Clean up old duplicate Lovelace files from previous adapter names. This prevents many
-            // duplicate card entries in the Lovelace card picker.
-            await this.cleanupOldVictronLovelaceFiles(instance, [...targetFiles, ...yamlFiles]);
+            const sources = {
+                'cards/victronadapter-card.js': await fs.readFile(
+                    path.join(__dirname, 'lovelace', 'victronadapter-card.js'),
+                    'utf8'
+                ),
+                'cards/victronadapter-flow.yaml': this.buildLovelaceYaml('custom:victronadapter-flow', false),
+                'cards/victronadapter-flow-circle.yaml': this.buildLovelaceYaml(
+                    'custom:victronadapter-flow-circle',
+                    true
+                ),
+                'cards/victronadapter-flow-hub.yaml': this.buildLovelaceYaml('custom:victronadapter-flow-hub', false, [
+                    'pv_peak_w: 10000',
+                    'show_ev: auto',
+                    'subtract_ev_from_house: false',
+                    'show_debug: false'
+                ]),
+                'cards/victronadapter-dashboard.yaml': this.buildDashboardYaml()
+            };
 
-            const sourcePath = path.join(__dirname, 'lovelace', 'victronadapter-card.js');
-            const cardSource = await fs.readFile(sourcePath, 'utf8');
-            const valueYaml = [
-                'values:',
-                '  last_update_ms:',
-                '    - sensor.victronadapter_0_dashboard_last_update_ms',
-                '    - victronadapter.0.dashboard.last_update_ms',
-                '  grid_total:',
-                '    - sensor.victronadapter_0_dashboard_grid_total',
-                '    - victronadapter.0.dashboard.grid_total',
-                '  grid_l1:',
-                '    - sensor.victronadapter_0_dashboard_grid_l1',
-                '    - victronadapter.0.dashboard.grid_l1',
-                '  grid_l2:',
-                '    - sensor.victronadapter_0_dashboard_grid_l2',
-                '    - victronadapter.0.dashboard.grid_l2',
-                '  grid_l3:',
-                '    - sensor.victronadapter_0_dashboard_grid_l3',
-                '    - victronadapter.0.dashboard.grid_l3',
-                '  grid_status:',
-                '    - sensor.victronadapter_0_dashboard_grid_status',
-                '    - victronadapter.0.dashboard.grid_status',
-                '  pv_total:',
-                '    - sensor.victronadapter_0_dashboard_pv_total',
-                '    - victronadapter.0.dashboard.pv_total',
-                '  pv_ac:',
-                '    - sensor.victronadapter_0_dashboard_pv_ac',
-                '    - victronadapter.0.dashboard.pv_ac',
-                '  pv_ac_l1:',
-                '    - sensor.victronadapter_0_dashboard_pv_ac_l1',
-                '    - victronadapter.0.dashboard.pv_ac_l1',
-                '  pv_ac_l2:',
-                '    - sensor.victronadapter_0_dashboard_pv_ac_l2',
-                '    - victronadapter.0.dashboard.pv_ac_l2',
-                '  pv_ac_l3:',
-                '    - sensor.victronadapter_0_dashboard_pv_ac_l3',
-                '    - victronadapter.0.dashboard.pv_ac_l3',
-                '  pv_dc:',
-                '    - sensor.victronadapter_0_dashboard_pv_dc',
-                '    - victronadapter.0.dashboard.pv_dc',
-                '  house_total:',
-                '    - sensor.victronadapter_0_dashboard_house_total',
-                '    - victronadapter.0.dashboard.house_total',
-                '  ac_loads_total:',
-                '    - sensor.victronadapter_0_dashboard_ac_loads_total',
-                '    - victronadapter.0.dashboard.ac_loads_total',
-                '  ac_loads_l1:',
-                '    - sensor.victronadapter_0_dashboard_ac_loads_l1',
-                '    - victronadapter.0.dashboard.ac_loads_l1',
-                '  ac_loads_l2:',
-                '    - sensor.victronadapter_0_dashboard_ac_loads_l2',
-                '    - victronadapter.0.dashboard.ac_loads_l2',
-                '  ac_loads_l3:',
-                '    - sensor.victronadapter_0_dashboard_ac_loads_l3',
-                '    - victronadapter.0.dashboard.ac_loads_l3',
-                '  essential_loads_total:',
-                '    - sensor.victronadapter_0_dashboard_essential_loads_total',
-                '    - victronadapter.0.dashboard.essential_loads_total',
-                '  essential_loads_l1:',
-                '    - sensor.victronadapter_0_dashboard_essential_loads_l1',
-                '    - victronadapter.0.dashboard.essential_loads_l1',
-                '  essential_loads_l2:',
-                '    - sensor.victronadapter_0_dashboard_essential_loads_l2',
-                '    - victronadapter.0.dashboard.essential_loads_l2',
-                '  essential_loads_l3:',
-                '    - sensor.victronadapter_0_dashboard_essential_loads_l3',
-                '    - victronadapter.0.dashboard.essential_loads_l3',
-                '  battery_soc:',
-                '    - sensor.victronadapter_0_dashboard_battery_soc',
-                '    - victronadapter.0.dashboard.battery_soc',
-                '  battery_power:',
-                '    - sensor.victronadapter_0_dashboard_battery_power',
-                '    - victronadapter.0.dashboard.battery_power',
-                '  battery_voltage:',
-                '    - sensor.victronadapter_0_dashboard_battery_voltage',
-                '    - victronadapter.0.dashboard.battery_voltage',
-                '  battery_current:',
-                '    - sensor.victronadapter_0_dashboard_battery_current',
-                '    - victronadapter.0.dashboard.battery_current',
-                '  battery_temperature:',
-                '    - sensor.victronadapter_0_dashboard_battery_temperature',
-                '    - victronadapter.0.dashboard.battery_temperature',
-                '  battery_status:',
-                '    - sensor.victronadapter_0_dashboard_battery_status',
-                '    - victronadapter.0.dashboard.battery_status',
-                '  surplus:',
-                '    - sensor.victronadapter_0_dashboard_surplus',
-                '    - victronadapter.0.dashboard.surplus'
-            ].join('\n');
-            const yamlSourceClassic = [
-                'type: custom:victronadapter-flow',
-                'title: Energiefluss',
-                'subtitle: Victron Adapter',
-                'show_details: true',
-                'show_debug: true',
-                valueYaml,
-                ''
-            ].join('\n');
-            const yamlSourceCircle = [
-                'type: custom:victronadapter-flow-circle',
-                'title: Energiefluss',
-                'subtitle: Victron Adapter',
-                'show_details: true',
-                'transparent_background: true',
-                'show_debug: true',
-                valueYaml,
-                ''
-            ].join('\n');
-
-            for (const targetFile of targetFiles) {
-                await this.writeFileAsync(instance, targetFile, cardSource);
-                this.log.info(`Lovelace custom card installed/updated at /${instance}/${targetFile}`);
+            let changed = false;
+            for (const file of files) {
+                const current = await this.readForeignFileText(instance, file);
+                if (current === sources[file]) continue;
+                await this.writeFileAsync(instance, file, sources[file]);
+                changed = true;
+                this.log.info(`Lovelace file installed/updated: /${instance}/${file}`);
             }
-            for (const yamlFile of yamlFiles) {
-                const content = yamlFile.includes('circle') ? yamlSourceCircle : yamlSourceClassic;
-                await this.writeFileAsync(instance, yamlFile, content);
-            }
-            this.log.info(`Lovelace YAML examples freshly installed at /${instance}/${yamlFiles[0]} and /${instance}/${yamlFiles[1]}`);
 
-            await this.setStateAsync('lovelace.cardInstalled', true, true);
-            await this.setStateAsync('lovelace.cardPath', statePath, true);
-            await this.setStateAsync('lovelace.cardError', '', true);
-            if (this.config.restartLovelaceAfterCardInstall) await this.restartLovelaceInstance(instance);
+            await this.safeSetStateAsync('lovelace.cardInstalled', true, true);
+            await this.safeSetStateAsync('lovelace.cardPath', statePath, true);
+            await this.safeSetStateAsync('lovelace.cardError', '', true);
+            if (changed) {
+                this.log.info(
+                    `The Victron Lovelace card was installed or updated. Please restart ${instance} once so Lovelace loads the new card.`
+                );
+            }
         } catch (error) {
-            await this.setStateAsync('lovelace.cardInstalled', false, true);
-            await this.setStateAsync('lovelace.cardPath', statePath, true);
-            await this.setStateAsync('lovelace.cardError', error.message, true);
+            await this.safeSetStateAsync('lovelace.cardInstalled', false, true);
+            await this.safeSetStateAsync('lovelace.cardPath', statePath, true);
+            await this.safeSetStateAsync('lovelace.cardError', error.message, true);
             this.log.warn(`Could not install Lovelace custom card: ${error.message}`);
         }
     }
 
-    async cleanupOldVictronLovelaceFiles(instance, keepFiles = []) {
-        const keep = new Set(keepFiles);
-        const candidates = new Set([
-            'cards/victronaddapter-card.js',
-            'cards/victronaddapter-flow.js',
-            'cards/victronaddapter-flow-circle.js',
-            'cards/victronaddapter-flow.yaml',
-            'cards/victronaddapter-flow-circle.yaml',
-            'cards/victronadapter-flow.js',
-            'cards/victronadapter-flow-circle.js',
-
-            'cards/victron-house-control-direct.js',
-            'cards/victron-energy-flow-card.js',
-            'cards/victron-energy-flow-card-v2.js',
-            'cards/victron-energy-flow-card-v3.js',
-            'cards/victron-energy-flow-card-v4.js',
-            'cards/victron-energy-flow-card-v5.js',
-            'cards/victron-energy-flow-card-v6.js',
-            'cards/victron-energy-flow-card-v7.js',
-            'cards/victron-energy-flow-card-v8.js',
-            'cards/victron-energy-flow-card-v9.js',
-            'cards/victron-energy-flow-card-v10.js',
-            'cards/victron-energy-flow-card-v11.js',
-            'cards/victron-energy-flow-card-v12.js',
-            'cards/victron-energy-flow-card-v13.js',
-            'cards/victron-energy-flow-card-v14.js',
-            'cards/victron-energy-flow-card-v15.js',
-            'cards/victron-energy-flow-card-v16.js',
-            'cards/victron-energy-flow-card-v17.js',
-            'cards/victron-energy-flow-card-v18.js',
-            'cards/victron-energy-flow-card-v19.js',
-            'cards/victron-energy-flow-card-v20.js',
-            'cards/victron-energy-flow-card-v21.js',
-            'cards/victron-energy-flow-card-v24.js',
-            'cards/victron-energy-flow-card-v25.js',
-            'cards/victron-energy-flow-card-v28.js',
-            'cards/victron-energy-flow-card-v29.js',
-            'cards/victron-energy-flow-card-v30.js',
-            'cards/victron-energy-flow-card-v31.js',
-            'cards/victron-energy-flow-card-v34.js',
-            'cards/victron-energy-flow-card-v35.js',
-            'cards/victron-energy-flow-card-v36.js',
-            'cards/victron-energy-flow-card-v37.js',
-            'cards/victron-energy-flow-card-v38.js',
-            'cards/victron-energy-flow-card-v39.js',
-            'cards/victron-energy-flow-card-v40.js',
-            'cards/victron-energy-flow-card-v41.js',
-            'cards/lovelace-victron-flow-example.yaml',
-            'cards/victron-energy-flow-card.yaml',
-            'cards/victron-energy-flow-card-v24.yaml',
-            'cards/victron-energy-flow-card-v25.yaml',
-            'cards/victron-energy-flow-card-v28.yaml',
-            'cards/victron-energy-flow-card-v29.yaml',
-            'cards/victron-energy-flow-card-v36.yaml',
-            'cards/victron-energy-flow-card-v37.yaml',
-            'cards/victron-energy-flow-card-v38.yaml',
-            'cards/victron-energy-flow-card-v39.yaml',
-            'cards/victron-energy-flow-card-v40.yaml',
-            'cards/victron-energy-flow-card-v41.yaml',
-            'lovelace-victron-flow-example.yaml',
-            'victron-energy-flow-card.yaml'
-        ]);
-
-        // Also scan the Lovelace cards directory when the ioBroker file API supports it.
-        if (typeof this.readDirAsync === 'function') {
-            try {
-                const entries = await this.readDirAsync(instance, 'cards');
-                for (const entry of entries || []) {
-                    const name = String(entry.file || entry.fileName || entry.name || '').trim();
-                    if (!name) continue;
-                    if (/^victron-energy-flow-card.*\.js$/i.test(name) || /^victron.*\.(ya?ml)$/i.test(name) || /^lovelace-victron.*\.(ya?ml)$/i.test(name)) {
-                        candidates.add(`cards/${name}`);
-                    }
-                }
-            } catch (error) {
-                this.log.debug(`Could not scan Lovelace cards directory before cleanup: ${error.message}`);
-            }
+    /**
+     * Returns the content of a file in the ioBroker file storage as text, or null if it does not exist.
+     *
+     * @param {string} instance adapter instance owning the file storage
+     * @param {string} file file path inside the storage
+     */
+    async readForeignFileText(instance, file) {
+        try {
+            const result = await this.readFileAsync(instance, file);
+            return this.fileContentToString(result);
+        } catch {
+            return null;
         }
-
-        let removed = 0;
-        for (const file of candidates) {
-            if (keep.has(file)) continue;
-            if (await this.deleteLovelaceFileIfExists(instance, file)) removed++;
-        }
-        return removed;
     }
 
-    async deleteLovelaceFileIfExists(instance, file) {
-        try {
-            await this.readFileAsync(instance, file);
-        } catch (error) {
-            return false;
-        }
-
-        const attempts = [
-            ['delFileAsync', [instance, file]],
-            ['deleteFileAsync', [instance, file]],
-            ['unlinkAsync', [instance, file]],
-            ['rmAsync', [instance, file]]
+    /**
+     * Builds one of the YAML example files for the Lovelace card.
+     *
+     * @param {string} type Lovelace card type
+     * @param {boolean} circle true for the circle variant
+     */
+    /** Complete example view with all cards (paste into the raw configuration editor). */
+    buildDashboardYaml() {
+        const instance = this.namespace;
+        const card = (type, extra = []) => [
+            `      - type: custom:${type}`,
+            ...(instance === 'victronadapter.0' ? [] : [`        instance: ${instance}`]),
+            ...extra.map((line) => `        ${line}`)
         ];
-        for (const [method, args] of attempts) {
-            if (typeof this[method] !== 'function') continue;
-            try {
-                await this[method](...args);
-                this.log.info(`Removed old Lovelace file /${instance}/${file}`);
-                return true;
-            } catch (error) {
-                this.log.debug(`Delete method ${method} failed for /${instance}/${file}: ${error.message}`);
-            }
-        }
+        return [
+            '# Victron dashboard view - paste into Lovelace: Edit dashboard > Raw configuration editor > views',
+            'title: Energie',
+            'path: energie',
+            'icon: mdi:solar-power',
+            'cards:',
+            '  - type: vertical-stack',
+            '    cards:',
+            ...card('victronadapter-status'),
+            ...card('victronadapter-flow-hub', [
+                'pv_peak_w: 10000',
+                'show_ev: auto',
+                '# consumers:',
+                '#   - name: Wärmepumpe',
+                '#     entity: sensor.waermepumpe_leistung',
+                '#     icon: heatpump'
+            ]),
+            ...card('victronadapter-mini'),
+            '  - type: vertical-stack',
+            '    cards:',
+            ...card('victronadapter-today'),
+            ...card('victronadapter-day-chart'),
+            ...card('victronadapter-history'),
+            '  - type: vertical-stack',
+            '    cards:',
+            ...card('victronadapter-battery'),
+            ...card('victronadapter-surplus'),
+            ...card('victronadapter-dess', ['# price_entity: sensor.tibber_price']),
+            ...card('victronadapter-control'),
+            ''
+        ].join('\n');
+    }
 
-        // Last resort: overwrite with an empty comment. The new V22/V23 files are written afterwards.
-        try {
-            await this.writeFileAsync(instance, file, '/* removed by victron-house-control cleanup */\n');
-            this.log.warn(`Could not physically delete /${instance}/${file}; replaced it with an empty placeholder.`);
-            return true;
-        } catch (error) {
-            this.log.warn(`Could not delete or overwrite old Lovelace file /${instance}/${file}: ${error.message}`);
-            return false;
+    buildLovelaceYaml(type, circle, extraLines = []) {
+        const ns = this.namespace;
+        const sensorPrefix = `sensor.${ns.replace(/\./g, '_')}_dashboard`;
+        const keys = [
+            'last_update_ms',
+            'grid_total',
+            'grid_l1',
+            'grid_l2',
+            'grid_l3',
+            'grid_status',
+            'pv_total',
+            'pv_ac',
+            'pv_ac_l1',
+            'pv_ac_l2',
+            'pv_ac_l3',
+            'pv_dc',
+            'house_total',
+            'ac_loads_total',
+            'ac_loads_l1',
+            'ac_loads_l2',
+            'ac_loads_l3',
+            'essential_loads_total',
+            'essential_loads_l1',
+            'essential_loads_l2',
+            'essential_loads_l3',
+            'battery_soc',
+            'battery_power',
+            'battery_voltage',
+            'battery_current',
+            'battery_temperature',
+            'battery_status',
+            'surplus',
+            'ev_power'
+        ];
+        const lines = [`type: ${type}`, 'title: Energiefluss', 'subtitle: Victron Adapter', 'show_details: true'];
+        if (circle) lines.push('transparent_background: true');
+        lines.push(...extraLines);
+        if (!extraLines.some((line) => line.startsWith('show_debug'))) lines.push('show_debug: true');
+        lines.push('values:');
+        for (const key of keys) {
+            lines.push(`  ${key}:`, `    - ${sensorPrefix}_${key}`, `    - ${ns}.dashboard.${key}`);
         }
+        lines.push('');
+        return lines.join('\n');
     }
 
     fileContentToString(value) {
@@ -517,55 +683,52 @@ class VictronHouseControl extends utils.Adapter {
         return String(value);
     }
 
-    async restartLovelaceInstance(instance) {
-        const objectId = `system.adapter.${instance}`;
-        try {
-            const obj = await this.getForeignObjectAsync(objectId);
-            if (!obj || !obj.common || obj.common.enabled === false) {
-                this.log.info(`Lovelace instance ${instance} is not enabled; card was installed but no restart was triggered.`);
-                return;
-            }
-
-            this.log.info(`Restarting ${instance} once so the new Victron custom card is loaded.`);
-            await this.extendForeignObjectAsync(objectId, { common: { enabled: false } });
-            await this.delay(2500);
-            await this.extendForeignObjectAsync(objectId, { common: { enabled: true } });
-            await this.setStateAsync('lovelace.lastRestart', new Date().toISOString(), true);
-        } catch (error) {
-            await this.setStateAsync('lovelace.cardError', `Karte installiert, aber Lovelace-Neustart fehlgeschlagen: ${error.message}`, true);
-            this.log.warn(`Lovelace card was installed but ${instance} could not be restarted automatically: ${error.message}`);
-        }
-    }
-
-    delay(ms) {
-        return new Promise(resolve => this.setTimeout(resolve, ms));
-    }
-
     sanitizeLovelaceEntityName(value) {
-        return String(value || '')
-            .toLowerCase()
-            .replace(/ä/g, 'ae')
-            .replace(/ö/g, 'oe')
-            .replace(/ü/g, 'ue')
-            .replace(/ß/g, 'ss')
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, '')
-            .substring(0, 120) || 'victron_value';
+        return (
+            String(value || '')
+                .toLowerCase()
+                .replace(/ä/g, 'ae')
+                .replace(/ö/g, 'oe')
+                .replace(/ü/g, 'ue')
+                .replace(/ß/g, 'ss')
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '')
+                .substring(0, 120) || 'victron_value'
+        );
     }
 
-    buildLovelaceCustom(objectId, definition, writable) {
+    buildLovelaceCustom(objectId, definition, writable, common = {}) {
+        if (!this.config.installLovelaceCard) return null;
         const instance = String(this.config.lovelaceInstance || 'lovelace.0').trim() || 'lovelace.0';
         if (!/^lovelace\.\d+$/.test(instance)) return null;
 
-        // Only expose stable read values as Lovelace sensors automatically. Control states stay in ioBroker
-        // until a dedicated control card is added, so no unsafe write points are created in Lovelace.
-        if (writable) return null;
-        if (!objectId.startsWith('system.') && !objectId.startsWith('flow.') && !objectId.startsWith('dashboard.') && !objectId.startsWith('view.')) return null;
+        const exposed = ['system.', 'flow.', 'dashboard.', 'view.', 'statistics.', 'controls.', 'devices.', 'custom.'];
+        if (!exposed.some((prefix) => objectId.startsWith(prefix))) return null;
+        // Read-only device values stay in ioBroker (there are hundreds); writable ones are needed by the control card.
+        if (
+            !writable &&
+            (objectId.startsWith('devices.') || objectId.startsWith('custom.') || objectId.startsWith('controls.'))
+        ) {
+            return null;
+        }
+        if (objectId === 'statistics.storage_json') return null;
+        if (writable) {
+            // Writes from Lovelace go through the same checks (allowWrites, ranges) as every other write.
+            const name = this.sanitizeLovelaceEntityName(`${this.namespace}_${objectId.replace(/\./g, '_')}`);
+            const entity = definition.boolean
+                ? 'switch'
+                : definition.states || common.states
+                  ? 'input_select'
+                  : 'input_number';
+            return { [instance]: { enabled: true, entity, name } };
+        }
 
         const commonType = definition.commonType || definition.objectType || definition.type;
-        const ioBrokerType = ["string", "number", "boolean", "mixed", "array", "object"].includes(commonType)
+        const ioBrokerType = ['string', 'number', 'boolean', 'mixed', 'array', 'object'].includes(commonType)
             ? commonType
-            : (definition.boolean ? 'boolean' : 'number');
+            : definition.boolean
+              ? 'boolean'
+              : 'number';
         if (!['number', 'string', 'boolean'].includes(ioBrokerType)) return null;
 
         const name = this.sanitizeLovelaceEntityName(`${this.namespace}_${objectId.replace(/\./g, '_')}`);
@@ -580,7 +743,13 @@ class VictronHouseControl extends utils.Adapter {
 
     async ensureStateObject(objectId, definition, writable, native = {}) {
         const common = stateCommon(definition, writable);
-        const lovelaceCustom = this.buildLovelaceCustom(objectId, definition, writable);
+        if (writable && common.type === 'number') {
+            if (definition.unit === 'W' && common.min === undefined) common.min = this.config.writeSafetyMinW;
+            if (definition.unit === 'W' && common.max === undefined) common.max = this.config.writeSafetyMaxW;
+            if (definition.unit === '%' && common.min === undefined) common.min = 0;
+            if (definition.unit === '%' && common.max === undefined) common.max = 100;
+        }
+        const lovelaceCustom = this.buildLovelaceCustom(objectId, definition, writable, common);
         if (lovelaceCustom) {
             common.custom = lovelaceCustom;
         }
@@ -619,13 +788,30 @@ class VictronHouseControl extends utils.Adapter {
 
     async createSystemObjects() {
         for (const definition of SYSTEM_REGISTERS) {
-            await this.ensureStateObject(`system.${definition.id}`, definition, false, {
+            const objectId = `system.${definition.id}`;
+            await this.ensureStateObject(objectId, definition, Boolean(definition.write), {
                 unitId: this.config.unitIdSystem,
                 address: definition.address,
                 type: definition.type,
                 scale: definition.scale
             });
+            if (definition.write) await this.registerWritableState(objectId, this.config.unitIdSystem, definition);
         }
+    }
+
+    /**
+     * Remembers a writable state together with its Modbus target and subscribes to it.
+     *
+     * @param {string} objectId state id relative to the adapter namespace
+     * @param {number} unitId Modbus Unit-ID that receives the write
+     * @param {object} definition register definition
+     */
+    async registerWritableState(objectId, unitId, definition) {
+        const fullId = `${this.namespace}.${objectId}`;
+        if (!this.writableStates.has(fullId)) {
+            await this.subscribeStatesAsync(objectId);
+        }
+        this.writableStates.set(fullId, { objectId, unitId, definition });
     }
 
     async createFlowObjects() {
@@ -637,122 +823,380 @@ class VictronHouseControl extends utils.Adapter {
     }
 
     async createDashboardObjects() {
-        await this.ensureChannelObject('dashboard', 'Lovelace Dashboard', 'Synchronisierte Live-Werte für die Lovelace-Energieflusskarten. Die Einzelwerte und die JSON-Momentaufnahme stammen aus demselben Abfragezyklus.');
-        await this.ensureStateObject('dashboard.snapshot_json', {
-            id: 'snapshot_json',
-            name: 'Dashboard Momentaufnahme',
-            friendlyName: 'Dashboard Momentaufnahme',
-            description: 'JSON-Momentaufnahme für die Victron Lovelace-Karten. Enthält Netz, PV, Batterie, Lasten und Flussrichtung aus einem Polling-Zyklus.',
-            commonType: 'string',
-            type: 'string',
-            role: 'json'
-        }, false, { calculated: true, snapshot: true });
+        await this.ensureChannelObject(
+            'dashboard',
+            t('Live dashboard values', 'Lovelace Dashboard'),
+            t(
+                'Synchronised live values for dashboards and the Lovelace energy flow cards, all from the same poll cycle.',
+                'Synchronisierte Live-Werte für die Lovelace-Energieflusskarten. Die Einzelwerte und die JSON-Momentaufnahme stammen aus demselben Abfragezyklus.'
+            )
+        );
+        await this.ensureStateObject(
+            'dashboard.snapshot_json',
+            {
+                id: 'snapshot_json',
+                nameEn: 'Dashboard snapshot',
+                descriptionEn: 'JSON snapshot with grid, PV, battery, loads and flow direction from one poll cycle.',
+                name: 'Dashboard Momentaufnahme',
+                friendlyName: 'Dashboard Momentaufnahme',
+                description:
+                    'JSON-Momentaufnahme für die Victron Lovelace-Karten. Enthält Netz, PV, Batterie, Lasten und Flussrichtung aus einem Polling-Zyklus.',
+                commonType: 'string',
+                type: 'string',
+                role: 'json'
+            },
+            false,
+            { calculated: true, snapshot: true }
+        );
 
         const dashboardStates = [
-            ['last_update_ms', 'Dashboard Aktualisierung', 'Zeitpunkt der letzten Dashboard-Momentaufnahme als Unix-Zeit in Millisekunden.', 'number', 'value.time', 'ms'],
-            ['grid_total', 'Netzleistung gesamt live', 'Live-Wert für Netzleistung gesamt. Negativ bedeutet Einspeisung, positiv bedeutet Netzbezug.', 'number', 'value.power', 'W'],
+            [
+                'last_update_ms',
+                'Dashboard Aktualisierung',
+                'Zeitpunkt der letzten Dashboard-Momentaufnahme als Unix-Zeit in Millisekunden.',
+                'number',
+                'value.time',
+                'ms'
+            ],
+            [
+                'grid_total',
+                'Netzleistung gesamt live',
+                'Live-Wert für Netzleistung gesamt. Negativ bedeutet Einspeisung, positiv bedeutet Netzbezug.',
+                'number',
+                'value.power',
+                'W'
+            ],
             ['grid_l1', 'Netzleistung L1 live', 'Live-Wert Netzleistung Phase L1.', 'number', 'value.power', 'W'],
             ['grid_l2', 'Netzleistung L2 live', 'Live-Wert Netzleistung Phase L2.', 'number', 'value.power', 'W'],
             ['grid_l3', 'Netzleistung L3 live', 'Live-Wert Netzleistung Phase L3.', 'number', 'value.power', 'W'],
-            ['grid_flow', 'Netzfluss live', 'Entprellter Live-Wert für die Richtung der Netzfluss-Animation.', 'number', 'value.power', 'W'],
-            ['grid_status', 'Netzstatus live', 'Textstatus Netzbezug, Einspeisung oder ausgeglichen.', 'string', 'text', ''],
+            [
+                'grid_flow',
+                'Netzfluss live',
+                'Entprellter Live-Wert für die Richtung der Netzfluss-Animation.',
+                'number',
+                'value.power',
+                'W'
+            ],
+            [
+                'grid_status',
+                'Netzstatus live',
+                'Textstatus Netzbezug, Einspeisung oder ausgeglichen.',
+                'string',
+                'text',
+                ''
+            ],
             ['pv_total', 'PV gesamt live', 'Live-Wert PV-Erzeugung gesamt.', 'number', 'value.power', 'W'],
             ['pv_ac', 'PV AC live', 'Live-Wert PV-Erzeugung über AC-Wechselrichter.', 'number', 'value.power', 'W'],
             ['pv_ac_l1', 'PV AC L1 live', 'Live-Wert PV AC Phase L1.', 'number', 'value.power', 'W'],
             ['pv_ac_l2', 'PV AC L2 live', 'Live-Wert PV AC Phase L2.', 'number', 'value.power', 'W'],
             ['pv_ac_l3', 'PV AC L3 live', 'Live-Wert PV AC Phase L3.', 'number', 'value.power', 'W'],
             ['pv_dc', 'PV DC live', 'Live-Wert PV-Erzeugung über DC-Laderegler.', 'number', 'value.power', 'W'],
-            ['house_total', 'Haus gesamt live', 'Live-Wert gesamter Hausverbrauch aus AC-Lasten und essentiellen Lasten.', 'number', 'value.power', 'W'],
+            [
+                'house_total',
+                'Haus gesamt live',
+                'Live-Wert gesamter Hausverbrauch aus AC-Lasten und essentiellen Lasten.',
+                'number',
+                'value.power',
+                'W'
+            ],
             ['ac_loads_total', 'AC-Lasten gesamt live', 'Live-Wert normale AC-Lasten.', 'number', 'value.power', 'W'],
             ['ac_loads_l1', 'AC-Lasten L1 live', 'Live-Wert normale AC-Lasten Phase L1.', 'number', 'value.power', 'W'],
             ['ac_loads_l2', 'AC-Lasten L2 live', 'Live-Wert normale AC-Lasten Phase L2.', 'number', 'value.power', 'W'],
             ['ac_loads_l3', 'AC-Lasten L3 live', 'Live-Wert normale AC-Lasten Phase L3.', 'number', 'value.power', 'W'],
-            ['essential_loads_total', 'Essentielle Lasten gesamt live', 'Live-Wert essentielle Lasten am Wechselrichter-/Notstromausgang.', 'number', 'value.power', 'W'],
-            ['essential_loads_l1', 'Essentielle Lasten L1 live', 'Live-Wert essentielle Lasten Phase L1.', 'number', 'value.power', 'W'],
-            ['essential_loads_l2', 'Essentielle Lasten L2 live', 'Live-Wert essentielle Lasten Phase L2.', 'number', 'value.power', 'W'],
-            ['essential_loads_l3', 'Essentielle Lasten L3 live', 'Live-Wert essentielle Lasten Phase L3.', 'number', 'value.power', 'W'],
+            [
+                'essential_loads_total',
+                'Essentielle Lasten gesamt live',
+                'Live-Wert essentielle Lasten am Wechselrichter-/Notstromausgang.',
+                'number',
+                'value.power',
+                'W'
+            ],
+            [
+                'essential_loads_l1',
+                'Essentielle Lasten L1 live',
+                'Live-Wert essentielle Lasten Phase L1.',
+                'number',
+                'value.power',
+                'W'
+            ],
+            [
+                'essential_loads_l2',
+                'Essentielle Lasten L2 live',
+                'Live-Wert essentielle Lasten Phase L2.',
+                'number',
+                'value.power',
+                'W'
+            ],
+            [
+                'essential_loads_l3',
+                'Essentielle Lasten L3 live',
+                'Live-Wert essentielle Lasten Phase L3.',
+                'number',
+                'value.power',
+                'W'
+            ],
             ['battery_soc', 'Akku Ladezustand live', 'Live-Wert Batterie-Ladezustand.', 'number', 'value.battery', '%'],
-            ['battery_power', 'Akku Leistung live', 'Live-Wert Batterieleistung. Positiv bedeutet Laden, negativ bedeutet Entladen.', 'number', 'value.power', 'W'],
-            ['battery_flow', 'Akku Fluss live', 'Entprellter Live-Wert für die Richtung der Batterie-Animation.', 'number', 'value.power', 'W'],
+            [
+                'battery_power',
+                'Akku Leistung live',
+                'Live-Wert Batterieleistung. Positiv bedeutet Laden, negativ bedeutet Entladen.',
+                'number',
+                'value.power',
+                'W'
+            ],
+            [
+                'battery_flow',
+                'Akku Fluss live',
+                'Entprellter Live-Wert für die Richtung der Batterie-Animation.',
+                'number',
+                'value.power',
+                'W'
+            ],
             ['battery_voltage', 'Akku Spannung live', 'Live-Wert Batteriespannung.', 'number', 'value.voltage', 'V'],
             ['battery_current', 'Akku Strom live', 'Live-Wert Batteriestrom.', 'number', 'value.current', 'A'],
-            ['battery_temperature', 'Akku Temperatur live', 'Live-Wert Batterietemperatur.', 'number', 'value.temperature', '°C'],
+            [
+                'battery_temperature',
+                'Akku Temperatur live',
+                'Live-Wert Batterietemperatur.',
+                'number',
+                'value.temperature',
+                '°C'
+            ],
             ['battery_status', 'Akku Status live', 'Textstatus Laden, Entladen oder Standby.', 'string', 'text', ''],
-            ['surplus', 'PV Überschuss live', 'Live-Wert verfügbarer PV-Überschuss.', 'number', 'value.power', 'W']
+            ['surplus', 'PV Überschuss live', 'Live-Wert verfügbarer PV-Überschuss.', 'number', 'value.power', 'W'],
+            [
+                'ev_power',
+                'Wallbox Leistung live',
+                'Live-Wert Ladeleistung aller erkannten Victron-Wallboxen (EV charger).',
+                'number',
+                'value.power',
+                'W'
+            ],
+            [
+                'alarm_count',
+                'Anzahl aktiver Alarme',
+                'Anzahl aktiver Alarme und Fehler aller erkannten Geräte.',
+                'number',
+                'value',
+                ''
+            ],
+            ['alarm_level', 'Alarmstufe', '0 = OK, 1 = Warnung, 2 = Alarm.', 'number', 'value', ''],
+            ['alarms_json', 'Aktive Alarme', 'Liste der aktiven Alarme als JSON.', 'string', 'json', ''],
+            [
+                'battery_time_to_full_min',
+                'Akku voll in',
+                'Geschätzte Zeit bis der Akku voll ist (Minuten).',
+                'number',
+                'value',
+                'min'
+            ],
+            [
+                'battery_time_to_go_min',
+                'Akku Restlaufzeit',
+                'Geschätzte Restlaufzeit beim Entladen (Minuten).',
+                'number',
+                'value',
+                'min'
+            ],
+            [
+                'battery_capacity_kwh',
+                'Akku Kapazität',
+                'Nutzbare Akkukapazität aus der Konfiguration oder Dynamic ESS.',
+                'number',
+                'value',
+                'kWh'
+            ],
+            ['battery_soh', 'Akku Gesundheit', 'State of Health des Akkus.', 'number', 'value', '%'],
+            ['battery_cycles', 'Akku Ladezyklen', 'Anzahl Ladezyklen des Akkus.', 'number', 'value', ''],
+            [
+                'pv_forecast_today_kwh',
+                'PV-Prognose heute',
+                'PV-Prognose für heute aus dem konfigurierten Prognose-Datenpunkt.',
+                'number',
+                'value.energy',
+                'kWh'
+            ]
         ];
 
         for (const [id, name, description, commonType, role, unit] of dashboardStates) {
-            await this.ensureStateObject(`dashboard.${id}`, {
-                id,
-                name,
-                friendlyName: name,
-                description,
-                commonType,
-                type: commonType,
-                role,
-                unit
-            }, false, { calculated: true, dashboardScalar: true });
+            await this.ensureStateObject(
+                `dashboard.${id}`,
+                {
+                    id,
+                    nameEn: `${liveNameEn(id)} (live)`,
+                    descriptionEn: `Live value: ${liveNameEn(id)}.`,
+                    name,
+                    friendlyName: name,
+                    description,
+                    commonType,
+                    type: commonType,
+                    role,
+                    unit
+                },
+                false,
+                { calculated: true, dashboardScalar: true }
+            );
         }
     }
 
-
     async createViewObjects() {
-        await this.ensureChannelObject('view', 'Live Ansicht', 'Vom Adapter fertig berechnete Anzeige-Werte für Lovelace. Lovelace berechnet hier nichts mehr, sondern zeigt nur noch diese Werte an.');
-        await this.ensureStateObject('view.payload_json', {
-            id: 'payload_json',
-            name: 'Live Ansicht Payload',
-            friendlyName: 'Live Ansicht Payload',
-            description: 'Fertig berechnetes JSON-Payload für die Lovelace-Ansichten. Wird bei jedem Polling-Zyklus neu geschrieben, damit Lovelace Live-Updates erhält.',
-            commonType: 'string',
-            type: 'string',
-            role: 'json'
-        }, false, { calculated: true, viewPayload: true });
-        await this.ensureStateObject('view.load_sources_json', {
-            id: 'load_sources_json',
-            name: 'Lasten Quellen Diagnose',
-            friendlyName: 'Lasten Quellen Diagnose',
-            description: 'Diagnose der verwendeten Quellen für AC-Lasten und essentielle Lasten inklusive Roh-Phasenwerte.',
-            commonType: 'string',
-            type: 'string',
-            role: 'json'
-        }, false, { calculated: true, viewPayload: true });
-        await this.ensureStateObject('view.revision', {
-            id: 'revision', name: 'Live Ansicht Revision', friendlyName: 'Live Ansicht Revision',
-            description: 'Zähler, der bei jedem Polling-Zyklus erhöht wird. Dient Lovelace als Live-Update-Signal.',
-            commonType: 'number', type: 'number', role: 'value'
-        }, false, { calculated: true, viewPayload: true });
-        await this.ensureStateObject('view.last_change_ms', {
-            id: 'last_change_ms', name: 'Live Ansicht Änderung', friendlyName: 'Live Ansicht Änderung',
-            description: 'Zeitpunkt der letzten Anzeige-Wert-Änderung als Unix-Zeit in Millisekunden.',
-            commonType: 'number', type: 'number', role: 'value.time', unit: 'ms'
-        }, false, { calculated: true, viewPayload: true });
+        await this.ensureChannelObject(
+            'view',
+            t('Live view', 'Live Ansicht'),
+            t(
+                'Display values calculated by the adapter for visualisations.',
+                'Vom Adapter fertig berechnete Anzeige-Werte für Lovelace. Lovelace berechnet hier nichts mehr, sondern zeigt nur noch diese Werte an.'
+            )
+        );
+        await this.ensureStateObject(
+            'view.payload_json',
+            {
+                id: 'payload_json',
+                nameEn: 'Live view payload',
+                descriptionEn: 'Calculated JSON payload for visualisations, rewritten on every poll.',
+                name: 'Live Ansicht Payload',
+                friendlyName: 'Live Ansicht Payload',
+                description:
+                    'Fertig berechnetes JSON-Payload für die Lovelace-Ansichten. Wird bei jedem Polling-Zyklus neu geschrieben, damit Lovelace Live-Updates erhält.',
+                commonType: 'string',
+                type: 'string',
+                role: 'json'
+            },
+            false,
+            { calculated: true, viewPayload: true }
+        );
+        await this.ensureStateObject(
+            'view.load_sources_json',
+            {
+                id: 'load_sources_json',
+                nameEn: 'Load sources diagnostics',
+                descriptionEn: 'Diagnostics of the registers used for AC loads and essential loads.',
+                name: 'Lasten Quellen Diagnose',
+                friendlyName: 'Lasten Quellen Diagnose',
+                description:
+                    'Diagnose der verwendeten Quellen für AC-Lasten und essentielle Lasten inklusive Roh-Phasenwerte.',
+                commonType: 'string',
+                type: 'string',
+                role: 'json'
+            },
+            false,
+            { calculated: true, viewPayload: true }
+        );
+        await this.ensureStateObject(
+            'view.revision',
+            {
+                id: 'revision',
+                nameEn: 'Live view revision',
+                descriptionEn: 'Counter increased on every poll cycle.',
+                name: 'Live Ansicht Revision',
+                friendlyName: 'Live Ansicht Revision',
+                description: 'Zähler, der bei jedem Polling-Zyklus erhöht wird. Dient Lovelace als Live-Update-Signal.',
+                commonType: 'number',
+                type: 'number',
+                role: 'value'
+            },
+            false,
+            { calculated: true, viewPayload: true }
+        );
+        await this.ensureStateObject(
+            'view.last_change_ms',
+            {
+                id: 'last_change_ms',
+                nameEn: 'Live view timestamp',
+                descriptionEn: 'Time of the last display update in milliseconds.',
+                name: 'Live Ansicht Änderung',
+                friendlyName: 'Live Ansicht Änderung',
+                description: 'Zeitpunkt der letzten Anzeige-Wert-Änderung als Unix-Zeit in Millisekunden.',
+                commonType: 'number',
+                type: 'number',
+                role: 'value.time',
+                unit: 'ms'
+            },
+            false,
+            { calculated: true, viewPayload: true }
+        );
 
         const numberStates = [
-            ['grid_total', 'Netzleistung gesamt', 'W'], ['grid_l1', 'Netzleistung L1', 'W'], ['grid_l2', 'Netzleistung L2', 'W'], ['grid_l3', 'Netzleistung L3', 'W'], ['grid_flow', 'Netzfluss Richtung', 'W'],
-            ['pv_total', 'PV gesamt', 'W'], ['pv_ac', 'PV AC', 'W'], ['pv_ac_l1', 'PV AC L1', 'W'], ['pv_ac_l2', 'PV AC L2', 'W'], ['pv_ac_l3', 'PV AC L3', 'W'], ['pv_dc', 'PV DC', 'W'],
-            ['house_total', 'Haus gesamt', 'W'], ['house_l1', 'Haus L1', 'W'], ['house_l2', 'Haus L2', 'W'], ['house_l3', 'Haus L3', 'W'],
-            ['ac_loads_total', 'AC-Lasten gesamt', 'W'], ['ac_loads_l1', 'AC-Lasten L1', 'W'], ['ac_loads_l2', 'AC-Lasten L2', 'W'], ['ac_loads_l3', 'AC-Lasten L3', 'W'],
-            ['essential_loads_total', 'Essentielle Lasten gesamt', 'W'], ['essential_loads_l1', 'Essentielle Lasten L1', 'W'], ['essential_loads_l2', 'Essentielle Lasten L2', 'W'], ['essential_loads_l3', 'Essentielle Lasten L3', 'W'],
-            ['battery_soc', 'Akku Ladezustand', '%'], ['battery_power', 'Akku Leistung', 'W'], ['battery_flow', 'Akku Fluss Richtung', 'W'], ['battery_voltage', 'Akku Spannung', 'V'], ['battery_current', 'Akku Strom', 'A'], ['battery_temperature', 'Akku Temperatur', '°C'],
+            ['grid_total', 'Netzleistung gesamt', 'W'],
+            ['grid_l1', 'Netzleistung L1', 'W'],
+            ['grid_l2', 'Netzleistung L2', 'W'],
+            ['grid_l3', 'Netzleistung L3', 'W'],
+            ['grid_flow', 'Netzfluss Richtung', 'W'],
+            ['pv_total', 'PV gesamt', 'W'],
+            ['pv_ac', 'PV AC', 'W'],
+            ['pv_ac_l1', 'PV AC L1', 'W'],
+            ['pv_ac_l2', 'PV AC L2', 'W'],
+            ['pv_ac_l3', 'PV AC L3', 'W'],
+            ['pv_dc', 'PV DC', 'W'],
+            ['house_total', 'Haus gesamt', 'W'],
+            ['house_l1', 'Haus L1', 'W'],
+            ['house_l2', 'Haus L2', 'W'],
+            ['house_l3', 'Haus L3', 'W'],
+            ['ac_loads_total', 'AC-Lasten gesamt', 'W'],
+            ['ac_loads_l1', 'AC-Lasten L1', 'W'],
+            ['ac_loads_l2', 'AC-Lasten L2', 'W'],
+            ['ac_loads_l3', 'AC-Lasten L3', 'W'],
+            ['essential_loads_total', 'Essentielle Lasten gesamt', 'W'],
+            ['essential_loads_l1', 'Essentielle Lasten L1', 'W'],
+            ['essential_loads_l2', 'Essentielle Lasten L2', 'W'],
+            ['essential_loads_l3', 'Essentielle Lasten L3', 'W'],
+            ['battery_soc', 'Akku Ladezustand', '%'],
+            ['battery_power', 'Akku Leistung', 'W'],
+            ['battery_flow', 'Akku Fluss Richtung', 'W'],
+            ['battery_voltage', 'Akku Spannung', 'V'],
+            ['battery_current', 'Akku Strom', 'A'],
+            ['battery_temperature', 'Akku Temperatur', '°C'],
             ['surplus', 'PV Überschuss', 'W']
         ];
         for (const [id, name, unit] of numberStates) {
-            await this.ensureStateObject(`view.${id}`, {
-                id, name, friendlyName: name,
-                description: `Fertig berechneter Anzeige-Wert: ${name}.`,
-                commonType: 'number', type: 'number', role: unit === '%' ? 'value.battery' : unit === 'V' ? 'value.voltage' : unit === 'A' ? 'value.current' : unit === '°C' ? 'value.temperature' : 'value.power', unit
-            }, false, { calculated: true, viewPayload: true });
+            await this.ensureStateObject(
+                `view.${id}`,
+                {
+                    id,
+                    name,
+                    friendlyName: name,
+                    nameEn: liveNameEn(id),
+                    descriptionEn: `Calculated display value: ${liveNameEn(id)}.`,
+                    description: `Fertig berechneter Anzeige-Wert: ${name}.`,
+                    commonType: 'number',
+                    type: 'number',
+                    role:
+                        unit === '%'
+                            ? 'value.battery'
+                            : unit === 'V'
+                              ? 'value.voltage'
+                              : unit === 'A'
+                                ? 'value.current'
+                                : unit === '°C'
+                                  ? 'value.temperature'
+                                  : 'value.power',
+                    unit
+                },
+                false,
+                { calculated: true, viewPayload: true }
+            );
         }
         const textStates = [
             ['grid_status', 'Netzstatus'],
             ['battery_status', 'Akku Status']
         ];
         for (const [id, name] of textStates) {
-            await this.ensureStateObject(`view.${id}`, {
-                id, name, friendlyName: name,
-                description: `Fertig berechneter Anzeige-Text: ${name}.`,
-                commonType: 'string', type: 'string', role: 'text'
-            }, false, { calculated: true, viewPayload: true });
+            await this.ensureStateObject(
+                `view.${id}`,
+                {
+                    id,
+                    name,
+                    friendlyName: name,
+                    nameEn: liveNameEn(id),
+                    descriptionEn: `Calculated display text: ${liveNameEn(id)}.`,
+                    description: `Fertig berechneter Anzeige-Text: ${name}.`,
+                    commonType: 'string',
+                    type: 'string',
+                    role: 'text'
+                },
+                false,
+                { calculated: true, viewPayload: true }
+            );
         }
     }
 
@@ -762,32 +1206,63 @@ class VictronHouseControl extends utils.Adapter {
             if (definition.requiresLegacySetpoint && !this.config.legacySetpointEnabled) continue;
 
             const objectId = `controls.${definition.id}`;
-            this.controlByStateId.set(`${this.namespace}.${objectId}`, definition);
-            await this.ensureStateObject(objectId, definition, definition.write, {
+            await this.ensureStateObject(objectId, definition, Boolean(definition.write), {
                 unitId: this.config.controlUnitId,
                 address: definition.address,
                 type: definition.type,
                 scale: definition.scale,
                 rawScaleForWrite: definition.rawScaleForWrite
             });
+            if (definition.write) await this.registerWritableState(objectId, this.config.controlUnitId, definition);
         }
     }
 
-    async createRawWriteObjects() {
-        await this.ensureChannelObject('raw', 'Rohzugriff Modbus', 'Technischer Testbereich für direkte Modbus-Schreibbefehle. Nur für Diagnose verwenden.');
-        await this.ensureChannelObject(this.rawPrefix, 'Direkter Schreibbefehl', 'Direktes Schreiben eines einzelnen Modbus-Registers. Nur mit Vorsicht verwenden.');
-        const rawStates = [
-            { id: 'unitId', type: 'number', role: 'value', name: 'Ziel Unit-ID', desc: 'Modbus Unit-ID des Zielgeräts.', def: this.config.controlUnitId },
-            { id: 'address', type: 'number', role: 'value', name: 'Zielregister', desc: 'Technische Modbus-Registeradresse.', def: 2700 },
-            { id: 'value', type: 'number', role: 'value', name: 'Rohwert', desc: 'Unskalierter Registerwert, der geschrieben werden soll.', def: 0 },
-            { id: 'execute', type: 'boolean', role: 'button', name: 'Schreibbefehl ausführen', desc: 'Startet den direkten Schreibbefehl.', def: false }
-        ];
-        for (const state of rawStates) {
-            await this.setObjectNotExistsAsync(`${this.rawPrefix}.${state.id}`, {
-                type: 'state',
-                common: { name: state.name, type: state.type, role: state.role, read: true, write: true, def: state.def, desc: state.desc },
-                native: {}
+    /**
+     * Creates the states for the user defined registers (admin tab "Own registers") and removes
+     * states of rows that were deleted from the table.
+     */
+    async createCustomRegisterObjects() {
+        const wanted = new Set(this.customRegisters.map((definition) => `${this.namespace}.custom.${definition.id}`));
+        const existing = await this.getAdapterObjectsAsync();
+        for (const id of Object.keys(existing || {})) {
+            if (id.startsWith(`${this.namespace}.custom.`) && existing[id].type === 'state' && !wanted.has(id)) {
+                await this.delForeignObjectAsync(id);
+                this.log.info(`Removed custom register state ${id} (no longer configured)`);
+            }
+        }
+        if (!this.customRegisters.length) return;
+
+        await this.ensureChannelObject(
+            'custom',
+            t('Own registers', 'Eigene Register'),
+            t('Registers defined in the instance settings.', 'In der Instanzkonfiguration definierte Register.')
+        );
+        for (const definition of this.customRegisters) {
+            const objectId = `custom.${definition.id}`;
+            await this.ensureStateObject(objectId, definition, definition.write, {
+                unitId: definition.unitId,
+                address: definition.address,
+                type: definition.type,
+                scale: definition.scale,
+                custom: true
             });
+            if (definition.write) await this.registerWritableState(objectId, definition.unitId, definition);
+        }
+    }
+
+    /**
+     * Version 0.6.x created a raw write channel (raw.write.*). It allowed writing any register
+     * on any Unit-ID and was replaced by typed writable states and the own register table.
+     */
+    async removeLegacyRawObjects() {
+        try {
+            const obj = await this.getObjectAsync('raw');
+            if (obj) {
+                await this.delObjectAsync('raw', { recursive: true });
+                this.log.info('Removed obsolete raw.write.* objects of version 0.6.x');
+            }
+        } catch (error) {
+            this.log.debug(`Could not remove legacy raw objects: ${error.message}`);
         }
     }
 
@@ -801,7 +1276,11 @@ class VictronHouseControl extends utils.Adapter {
             } catch (error) {
                 if (this.isStopping) return;
                 await this.safeSetStateAsync('info.connection', false, true);
-                await this.safeSetStateAsync('status.lastError', `Connection failed to ${this.config.host}:${this.config.port} - ${error.message}`, true);
+                await this.safeSetStateAsync(
+                    'status.lastError',
+                    `Connection failed to ${this.config.host}:${this.config.port} - ${error.message}`,
+                    true
+                );
                 this.log.warn(`Connection failed to ${this.config.host}:${this.config.port}: ${error.message}`);
                 return;
             }
@@ -812,7 +1291,7 @@ class VictronHouseControl extends utils.Adapter {
             successCount += await this.readDefinitions(this.config.unitIdSystem, SYSTEM_REGISTERS, 'system');
             if (this.isStopping) return;
 
-            const activeControls = CONTROL_REGISTERS.filter(definition => {
+            const activeControls = CONTROL_REGISTERS.filter((definition) => {
                 if (definition.requiresNewSetpoint && !this.config.useNewSetpoint) return false;
                 if (definition.requiresLegacySetpoint && !this.config.legacySetpointEnabled) return false;
                 return true;
@@ -822,7 +1301,21 @@ class VictronHouseControl extends utils.Adapter {
 
             for (const device of this.discoveredDevices.values()) {
                 if (this.isStopping) return;
-                successCount += await this.readDefinitions(device.unitId, device.profile.registers, `devices.unit_${device.unitId}.${device.profile.key}`);
+                successCount += await this.readDefinitions(
+                    device.unitId,
+                    device.profile.registers,
+                    `devices.unit_${device.unitId}.${device.profile.key}`
+                );
+            }
+
+            const customByUnit = new Map();
+            for (const definition of this.customRegisters) {
+                if (!customByUnit.has(definition.unitId)) customByUnit.set(definition.unitId, []);
+                customByUnit.get(definition.unitId).push(definition);
+            }
+            for (const [unitId, definitions] of customByUnit) {
+                if (this.isStopping) return;
+                successCount += await this.readDefinitions(unitId, definitions, 'custom');
             }
 
             if (this.isStopping) return;
@@ -872,7 +1365,7 @@ class VictronHouseControl extends utils.Adapter {
         let end = null;
         for (const definition of sorted) {
             const length = getRegisterLength(definition.type);
-            if (!group.length || (definition.address === end && (definition.address + length - group[0].address) <= 60)) {
+            if (!group.length || (definition.address === end && definition.address + length - group[0].address <= 60)) {
                 group.push(definition);
                 end = definition.address + length;
             } else {
@@ -888,7 +1381,10 @@ class VictronHouseControl extends utils.Adapter {
     async readDefinitionGroup(unitId, group, prefix) {
         if (this.isStopping) return 0;
         const start = group[0].address;
-        const end = group.reduce((max, definition) => Math.max(max, definition.address + getRegisterLength(definition.type)), start);
+        const end = group.reduce(
+            (max, definition) => Math.max(max, definition.address + getRegisterLength(definition.type)),
+            start
+        );
         const quantity = end - start;
         try {
             const registers = await this.client.readHoldingRegisters(unitId, start, quantity);
@@ -909,10 +1405,14 @@ class VictronHouseControl extends utils.Adapter {
             return count;
         } catch (error) {
             if (this.isShutdownError(error)) {
-                this.log.debug(`Grouped read stopped during shutdown unit=${unitId} address=${start}: ${error.message}`);
+                this.log.debug(
+                    `Grouped read stopped during shutdown unit=${unitId} address=${start}: ${error.message}`
+                );
                 return 0;
             }
-            this.log.debug(`Grouped read failed unit=${unitId} address=${start} quantity=${quantity}: ${error.message}`);
+            this.log.debug(
+                `Grouped read failed unit=${unitId} address=${start} quantity=${quantity}: ${error.message}`
+            );
             let count = 0;
             for (const definition of group) {
                 if (this.isStopping) break;
@@ -922,40 +1422,14 @@ class VictronHouseControl extends utils.Adapter {
         }
     }
 
-    async readDefinitionGroup(unitId, group, prefix) {
-        const start = group[0].address;
-        const end = group.reduce((max, definition) => Math.max(max, definition.address + getRegisterLength(definition.type)), start);
-        const quantity = end - start;
-        try {
-            const registers = await this.client.readHoldingRegisters(unitId, start, quantity);
-            let count = 0;
-            for (const definition of group) {
-                const offset = definition.address - start;
-                const length = getRegisterLength(definition.type);
-                const slice = registers.slice(offset, offset + length);
-                const value = decodeRegisters(slice, definition.type, definition.scale, definition.boolean);
-                if (value !== null && value !== undefined) {
-                    const objectId = `${prefix}.${definition.id}`;
-                    await this.setStateAsync(objectId, value, true);
-                    this.lastValues.set(objectId, value);
-                    count++;
-                }
-            }
-            return count;
-        } catch (error) {
-            this.log.debug(`Grouped read failed unit=${unitId} address=${start} quantity=${quantity}: ${error.message}`);
-            let count = 0;
-            for (const definition of group) {
-                if (await this.readDefinition(unitId, definition, `${prefix}.${definition.id}`)) count++;
-            }
-            return count;
-        }
-    }
-
     async readDefinition(unitId, definition, objectId) {
         if (this.isStopping) return false;
         try {
-            const registers = await this.client.readHoldingRegisters(unitId, definition.address, getRegisterLength(definition.type));
+            const registers = await this.client.readHoldingRegisters(
+                unitId,
+                definition.address,
+                getRegisterLength(definition.type)
+            );
             if (this.isStopping) return false;
             const value = decodeRegisters(registers, definition.type, definition.scale, definition.boolean);
             if (value !== null && value !== undefined) {
@@ -965,7 +1439,9 @@ class VictronHouseControl extends utils.Adapter {
             }
         } catch (error) {
             if (this.isShutdownError(error)) {
-                this.log.debug(`Read stopped during shutdown unit=${unitId} address=${definition.address}: ${error.message}`);
+                this.log.debug(
+                    `Read stopped during shutdown unit=${unitId} address=${definition.address}: ${error.message}`
+                );
                 return false;
             }
             this.log.debug(`Read failed unit=${unitId} address=${definition.address}: ${error.message}`);
@@ -974,7 +1450,7 @@ class VictronHouseControl extends utils.Adapter {
     }
 
     async updateFlowStates() {
-        const value = id => this.lastValues.get(`system.${id}`);
+        const value = (id) => this.lastValues.get(`system.${id}`);
         const first = (...ids) => {
             for (const id of ids) {
                 const v = value(id);
@@ -982,7 +1458,7 @@ class VictronHouseControl extends utils.Adapter {
             }
             return undefined;
         };
-        const sum = groups => {
+        const sum = (groups) => {
             let total = 0;
             let found = false;
             for (const ids of groups) {
@@ -1004,11 +1480,19 @@ class VictronHouseControl extends utils.Adapter {
             }
         };
 
-        const gridTotal = sum([['grid_l1_32', 'grid_l1'], ['grid_l2_32', 'grid_l2'], ['grid_l3_32', 'grid_l3']]);
+        const gridTotal = sum([
+            ['grid_l1_32', 'grid_l1'],
+            ['grid_l2_32', 'grid_l2'],
+            ['grid_l3_32', 'grid_l3']
+        ]);
         const acConsumptionL1 = first('ac_consumption_l1_32', 'ac_consumption_l1');
         const acConsumptionL2 = first('ac_consumption_l2_32', 'ac_consumption_l2');
         const acConsumptionL3 = first('ac_consumption_l3_32', 'ac_consumption_l3');
-        const acConsumptionTotal = sum([['ac_consumption_l1_32', 'ac_consumption_l1'], ['ac_consumption_l2_32', 'ac_consumption_l2'], ['ac_consumption_l3_32', 'ac_consumption_l3']]);
+        const acConsumptionTotal = sum([
+            ['ac_consumption_l1_32', 'ac_consumption_l1'],
+            ['ac_consumption_l2_32', 'ac_consumption_l2'],
+            ['ac_consumption_l3_32', 'ac_consumption_l3']
+        ]);
 
         let criticalL1 = first('consumption_on_output_l1');
         let criticalL2 = first('consumption_on_output_l2');
@@ -1019,22 +1503,53 @@ class VictronHouseControl extends utils.Adapter {
 
         // Some GX installations do not expose all split load registers consistently in Lovelace.
         // Fall back to the total AC consumption phases for essential loads and derive the other side if possible.
-        const deriveRemainder = (total, part) => Number.isFinite(total) && Number.isFinite(part) ? Math.max(0, total - part) : undefined;
-        if (!Number.isFinite(criticalL1)) criticalL1 = Number.isFinite(acConsumptionL1) && Number.isFinite(nonCriticalL1) ? Math.max(0, acConsumptionL1 - nonCriticalL1) : acConsumptionL1;
-        if (!Number.isFinite(criticalL2)) criticalL2 = Number.isFinite(acConsumptionL2) && Number.isFinite(nonCriticalL2) ? Math.max(0, acConsumptionL2 - nonCriticalL2) : acConsumptionL2;
-        if (!Number.isFinite(criticalL3)) criticalL3 = Number.isFinite(acConsumptionL3) && Number.isFinite(nonCriticalL3) ? Math.max(0, acConsumptionL3 - nonCriticalL3) : acConsumptionL3;
+        const deriveRemainder = (total, part) =>
+            Number.isFinite(total) && Number.isFinite(part) ? Math.max(0, total - part) : undefined;
+        if (!Number.isFinite(criticalL1))
+            criticalL1 =
+                Number.isFinite(acConsumptionL1) && Number.isFinite(nonCriticalL1)
+                    ? Math.max(0, acConsumptionL1 - nonCriticalL1)
+                    : acConsumptionL1;
+        if (!Number.isFinite(criticalL2))
+            criticalL2 =
+                Number.isFinite(acConsumptionL2) && Number.isFinite(nonCriticalL2)
+                    ? Math.max(0, acConsumptionL2 - nonCriticalL2)
+                    : acConsumptionL2;
+        if (!Number.isFinite(criticalL3))
+            criticalL3 =
+                Number.isFinite(acConsumptionL3) && Number.isFinite(nonCriticalL3)
+                    ? Math.max(0, acConsumptionL3 - nonCriticalL3)
+                    : acConsumptionL3;
         if (!Number.isFinite(nonCriticalL1)) nonCriticalL1 = deriveRemainder(acConsumptionL1, criticalL1);
         if (!Number.isFinite(nonCriticalL2)) nonCriticalL2 = deriveRemainder(acConsumptionL2, criticalL2);
         if (!Number.isFinite(nonCriticalL3)) nonCriticalL3 = deriveRemainder(acConsumptionL3, criticalL3);
 
         const criticalLoads = [criticalL1, criticalL2, criticalL3].filter(Number.isFinite).reduce((a, b) => a + b, 0);
         const criticalLoadsFound = [criticalL1, criticalL2, criticalL3].some(Number.isFinite);
-        const nonCriticalLoads = [nonCriticalL1, nonCriticalL2, nonCriticalL3].filter(Number.isFinite).reduce((a, b) => a + b, 0);
+        const nonCriticalLoads = [nonCriticalL1, nonCriticalL2, nonCriticalL3]
+            .filter(Number.isFinite)
+            .reduce((a, b) => a + b, 0);
         const nonCriticalLoadsFound = [nonCriticalL1, nonCriticalL2, nonCriticalL3].some(Number.isFinite);
-        const pvAcOutput = sum([['pv_ac_output_l1_32', 'pv_ac_output_l1'], ['pv_ac_output_l2_32', 'pv_ac_output_l2'], ['pv_ac_output_l3_32', 'pv_ac_output_l3']]);
-        const pvAcGrid = sum([['pv_ac_input_l1_32', 'pv_ac_input_l1'], ['pv_ac_input_l2_32', 'pv_ac_input_l2'], ['pv_ac_input_l3_32', 'pv_ac_input_l3']]);
-        const pvAcGenset = sum([['pv_ac_genset_l1_32', 'pv_ac_genset_l1'], ['pv_ac_genset_l2_32', 'pv_ac_genset_l2'], ['pv_ac_genset_l3_32', 'pv_ac_genset_l3']]);
-        const gensetTotal = sum([['genset_l1_32', 'genset_l1'], ['genset_l2_32', 'genset_l2'], ['genset_l3_32', 'genset_l3']]);
+        const pvAcOutput = sum([
+            ['pv_ac_output_l1_32', 'pv_ac_output_l1'],
+            ['pv_ac_output_l2_32', 'pv_ac_output_l2'],
+            ['pv_ac_output_l3_32', 'pv_ac_output_l3']
+        ]);
+        const pvAcGrid = sum([
+            ['pv_ac_input_l1_32', 'pv_ac_input_l1'],
+            ['pv_ac_input_l2_32', 'pv_ac_input_l2'],
+            ['pv_ac_input_l3_32', 'pv_ac_input_l3']
+        ]);
+        const pvAcGenset = sum([
+            ['pv_ac_genset_l1_32', 'pv_ac_genset_l1'],
+            ['pv_ac_genset_l2_32', 'pv_ac_genset_l2'],
+            ['pv_ac_genset_l3_32', 'pv_ac_genset_l3']
+        ]);
+        const gensetTotal = sum([
+            ['genset_l1_32', 'genset_l1'],
+            ['genset_l2_32', 'genset_l2'],
+            ['genset_l3_32', 'genset_l3']
+        ]);
         const pvDc = first('pv_dc_power');
         const batteryPower = first('battery_power');
         const inverterChargerPower = first('inverter_charger_power');
@@ -1076,24 +1591,36 @@ class VictronHouseControl extends utils.Adapter {
         const acMapL2 = first('ac_consumption_l2_32', 'ac_consumption_l2');
         const acMapL3 = first('ac_consumption_l3_32', 'ac_consumption_l3');
 
-        const phaseHasAny = arr => arr.some(Number.isFinite);
-        const phaseSum = arr => phaseHasAny(arr) ? arr.filter(Number.isFinite).reduce((a, b) => a + b, 0) : undefined;
-        const phaseValuesOrUndefined = arr => phaseHasAny(arr) ? arr : [undefined, undefined, undefined];
-        const sumPhase = (a, b) => Number.isFinite(a) || Number.isFinite(b) ? (Number.isFinite(a) ? a : 0) + (Number.isFinite(b) ? b : 0) : undefined;
+        const phaseHasAny = (arr) => arr.some(Number.isFinite);
+        const phaseSum = (arr) =>
+            phaseHasAny(arr) ? arr.filter(Number.isFinite).reduce((a, b) => a + b, 0) : undefined;
+        const phaseValuesOrUndefined = (arr) => (phaseHasAny(arr) ? arr : [undefined, undefined, undefined]);
+        const sumPhase = (a, b) =>
+            Number.isFinite(a) || Number.isFinite(b)
+                ? (Number.isFinite(a) ? a : 0) + (Number.isFinite(b) ? b : 0)
+                : undefined;
 
         const inputPhases = phaseValuesOrUndefined([inputL1, inputL2, inputL3]);
         const outputPhases = phaseValuesOrUndefined([outputL1, outputL2, outputL3]);
         const acConsumptionPhases = phaseValuesOrUndefined([acMapL1, acMapL2, acMapL3]);
 
-        const acDisplayPhases = inputPhases;                  // AC-Lasten / Victron Loads box
-        const essentialDisplayPhases = outputPhases;          // Essentielle Lasten / AC-Out
+        const acDisplayPhases = inputPhases; // AC-Lasten / Victron Loads box
+        const essentialDisplayPhases = outputPhases; // Essentielle Lasten / AC-Out
         const houseDisplayPhases = phaseHasAny(acConsumptionPhases)
             ? acConsumptionPhases
-            : [sumPhase(inputPhases[0], outputPhases[0]), sumPhase(inputPhases[1], outputPhases[1]), sumPhase(inputPhases[2], outputPhases[2])];
+            : [
+                  sumPhase(inputPhases[0], outputPhases[0]),
+                  sumPhase(inputPhases[1], outputPhases[1]),
+                  sumPhase(inputPhases[2], outputPhases[2])
+              ];
 
         const acLoadSource = phaseHasAny(acDisplayPhases) ? 'consumption_on_input_872_874_876_loads_box' : 'missing';
-        const essentialLoadSource = phaseHasAny(essentialDisplayPhases) ? 'consumption_on_output_878_880_882_ac_out' : 'missing';
-        const houseLoadSource = phaseHasAny(acConsumptionPhases) ? 'ac_consumption_902_904_906_fallback_817_818_819' : 'derived_from_input_plus_output';
+        const essentialLoadSource = phaseHasAny(essentialDisplayPhases)
+            ? 'consumption_on_output_878_880_882_ac_out'
+            : 'missing';
+        const houseLoadSource = phaseHasAny(acConsumptionPhases)
+            ? 'ac_consumption_902_904_906_fallback_817_818_819'
+            : 'derived_from_input_plus_output';
 
         const displayAcL1 = acDisplayPhases[0];
         const displayAcL2 = acDisplayPhases[1];
@@ -1123,9 +1650,22 @@ class VictronHouseControl extends utils.Adapter {
             displayEssential: essentialDisplayPhases,
             displayHouse: houseDisplayPhases,
             registers: {
-                acLoads: ['872:int32 L1 /Ac/ConsumptionOnInput/L1/Power', '874:int32 L2 /Ac/ConsumptionOnInput/L2/Power', '876:int32 L3 /Ac/ConsumptionOnInput/L3/Power'],
-                essentialLoads: ['878:int32 L1 /Ac/ConsumptionOnOutput/L1/Power', '880:int32 L2 /Ac/ConsumptionOnOutput/L2/Power', '882:int32 L3 /Ac/ConsumptionOnOutput/L3/Power'],
-                houseTotal: ['902:uint32 L1 /Ac/Consumption/L1/Power', '904:uint32 L2 /Ac/Consumption/L2/Power', '906:uint32 L3 /Ac/Consumption/L3/Power', 'fallback 817/818/819:uint16']
+                acLoads: [
+                    '872:int32 L1 /Ac/ConsumptionOnInput/L1/Power',
+                    '874:int32 L2 /Ac/ConsumptionOnInput/L2/Power',
+                    '876:int32 L3 /Ac/ConsumptionOnInput/L3/Power'
+                ],
+                essentialLoads: [
+                    '878:int32 L1 /Ac/ConsumptionOnOutput/L1/Power',
+                    '880:int32 L2 /Ac/ConsumptionOnOutput/L2/Power',
+                    '882:int32 L3 /Ac/ConsumptionOnOutput/L3/Power'
+                ],
+                houseTotal: [
+                    '902:uint32 L1 /Ac/Consumption/L1/Power',
+                    '904:uint32 L2 /Ac/Consumption/L2/Power',
+                    '906:uint32 L3 /Ac/Consumption/L3/Power',
+                    'fallback 817/818/819:uint16'
+                ]
             }
         };
 
@@ -1143,7 +1683,7 @@ class VictronHouseControl extends utils.Adapter {
         await setFlow('pv_ac_genset_total', pvAcGenset);
         await setFlow('pv_ac_total', pvAcFound ? pvAcTotal : undefined);
         await setFlow('pv_dc_total', pvDc);
-        await setFlow('pv_total', (pvAcFound || Number.isFinite(pvDc)) ? pvTotal : undefined);
+        await setFlow('pv_total', pvAcFound || Number.isFinite(pvDc) ? pvTotal : undefined);
         await setFlow('battery_power', batteryPower);
         await setFlow('battery_charge', Number.isFinite(batteryPower) ? Math.max(0, batteryPower) : undefined);
         await setFlow('battery_discharge', Number.isFinite(batteryPower) ? Math.max(0, -batteryPower) : undefined);
@@ -1152,15 +1692,32 @@ class VictronHouseControl extends utils.Adapter {
 
         if (this.isStopping) return;
         await this.updateDashboardSnapshot({
-            gridTotal, gridL1: first('grid_l1_32', 'grid_l1'), gridL2: first('grid_l2_32', 'grid_l2'), gridL3: first('grid_l3_32', 'grid_l3'),
+            gridTotal,
+            gridL1: first('grid_l1_32', 'grid_l1'),
+            gridL2: first('grid_l2_32', 'grid_l2'),
+            gridL3: first('grid_l3_32', 'grid_l3'),
             acConsumptionTotal,
-            houseTotal: displayHouseLoads, houseL1: displayHouseL1, houseL2: displayHouseL2, houseL3: displayHouseL3,
-            acLoadsL1: displayAcL1, acLoadsL2: displayAcL2, acLoadsL3: displayAcL3,
-            essentialL1: displayEssentialL1, essentialL2: displayEssentialL2, essentialL3: displayEssentialL3,
-            pvAcTotal: pvAcFound ? pvAcTotal : undefined, pvDc, pvTotal: (pvAcFound || Number.isFinite(pvDc)) ? pvTotal : undefined,
-            batteryPower, batteryVoltage: first('battery_voltage'), batteryCurrent: first('battery_current'), batterySoc: first('battery_soc'), batteryTemp: first('battery_temperature'),
+            houseTotal: displayHouseLoads,
+            houseL1: displayHouseL1,
+            houseL2: displayHouseL2,
+            houseL3: displayHouseL3,
+            acLoadsL1: displayAcL1,
+            acLoadsL2: displayAcL2,
+            acLoadsL3: displayAcL3,
+            essentialL1: displayEssentialL1,
+            essentialL2: displayEssentialL2,
+            essentialL3: displayEssentialL3,
+            pvAcTotal: pvAcFound ? pvAcTotal : undefined,
+            pvDc,
+            pvTotal: pvAcFound || Number.isFinite(pvDc) ? pvTotal : undefined,
+            batteryPower,
+            batteryVoltage: first('battery_voltage'),
+            batteryCurrent: first('battery_current'),
+            batterySoc: first('battery_soc'),
+            batteryTemp: first('battery_temperature'),
             surplus: Number.isFinite(gridTotal) ? Math.max(0, -gridTotal) : undefined,
-            inverterState: first('battery_state', 'active_input_source'), inverterChargerPower
+            inverterState: first('battery_state', 'active_input_source'),
+            inverterChargerPower
         });
     }
 
@@ -1180,7 +1737,7 @@ class VictronHouseControl extends utils.Adapter {
                 values.set(unit, { value: val, sortIndex });
             }
         }
-        return Array.from(values.values()).map(item => item.value);
+        return Array.from(values.values()).map((item) => item.value);
     }
 
     _sumDeviceFirst(profileKey, ...candidateIds) {
@@ -1219,10 +1776,13 @@ class VictronHouseControl extends utils.Adapter {
         const pvInvL3 = this._sumDeviceFirst('pvinverter', 'l3_power_1062', 'l3_power');
         const pvInvPhaseTotal = this._sumSnapshotValues(pvInvL1, pvInvL2, pvInvL3);
         const pvInvTotal = pick(base.pvAcTotal, this._sumDeviceFirst('pvinverter', 'total_power'), pvInvPhaseTotal);
-        const pvDcTotal = pick(base.pvDc, this._sumDeviceFirst('solarcharger', 'pv_power'));
+        const pvDcTotal = pick(base.pvDc, this._sumDeviceFirst('solarcharger', 'pv_power', 'pv_power_3730'));
         const pvTotal = this._sumSnapshotValues(pvInvTotal, pvDcTotal);
 
-        const batteryPower = pick(base.batteryPower, this._sumDeviceFirst('battery', 'battery_power', 'battery_power_258'));
+        const batteryPower = pick(
+            base.batteryPower,
+            this._sumDeviceFirst('battery', 'battery_power', 'battery_power_258')
+        );
         const batteryCurrent = pick(base.batteryCurrent, this._firstDeviceValue('battery', 'current'));
         const batteryVoltage = pick(base.batteryVoltage, this._firstDeviceValue('battery', 'battery_voltage'));
         const batterySoc = pick(base.batterySoc, this._firstDeviceValue('battery', 'soc'));
@@ -1240,14 +1800,18 @@ class VictronHouseControl extends utils.Adapter {
         const houseL1 = pick(base.houseL1, this._sumSnapshotValues(acL1, essentialL1));
         const houseL2 = pick(base.houseL2, this._sumSnapshotValues(acL2, essentialL2));
         const houseL3 = pick(base.houseL3, this._sumSnapshotValues(acL3, essentialL3));
-        const houseTotal = pick(base.houseTotal, this._sumSnapshotValues(houseL1, houseL2, houseL3), this._sumSnapshotValues(acTotal, essentialTotal));
+        const houseTotal = pick(
+            base.houseTotal,
+            this._sumSnapshotValues(houseL1, houseL2, houseL3),
+            this._sumSnapshotValues(acTotal, essentialTotal)
+        );
 
         const gridTotal = pick(base.gridTotal, this._sumSnapshotValues(base.gridL1, base.gridL2, base.gridL3));
         const gridDeadband = 15;
         const gridFlow = this._deadband(gridTotal, gridDeadband);
         const batteryFlow = this._deadband(batteryPower, 25);
         const snapshot = {
-            version: '0.6.9',
+            version: ADAPTER_VERSION,
             timestamp: new Date().toISOString(),
             timestampMs: Date.now(),
             grid: {
@@ -1299,7 +1863,10 @@ class VictronHouseControl extends utils.Adapter {
                 state: this._roundForSnapshot(base.inverterState),
                 chargerPower: this._roundForSnapshot(base.inverterChargerPower)
             },
-            surplus: this._roundForSnapshot(Number.isFinite(gridTotal) ? Math.max(0, -gridTotal) : base.surplus)
+            surplus: this._roundForSnapshot(Number.isFinite(gridTotal) ? Math.max(0, -gridTotal) : base.surplus),
+            ev: {
+                power: this._roundForSnapshot(this._sumDeviceFirst('evcharger', 'total_power'))
+            }
         };
 
         // Dedicated live view data for Lovelace cards.
@@ -1393,11 +1960,13 @@ class VictronHouseControl extends utils.Adapter {
         await setDashboard('battery_temperature', snapshot.battery.temperature);
         await setDashboard('battery_status', snapshot.battery.status);
         await setDashboard('surplus', snapshot.surplus);
+        await setDashboard('ev_power', snapshot.ev.power);
         await this.safeSetStateAsync('dashboard.snapshot_json', JSON.stringify(snapshot), true);
         // Commit signal for Lovelace live cards. Must be written after all values and snapshot.
+        await this.updateDashboardExtras(snapshot);
+        await this.updateStatistics(snapshot);
         await setDashboard('last_update_ms', snapshot.timestampMs);
     }
-
 
     async updateViewStates(snapshot) {
         const ui = snapshot && snapshot.ui ? snapshot.ui : null;
@@ -1419,7 +1988,7 @@ class VictronHouseControl extends utils.Adapter {
         };
 
         const payload = {
-            version: '0.6.9',
+            version: ADAPTER_VERSION,
             revision: this.viewRevision,
             updatedAt: snapshot.timestamp || new Date().toISOString(),
             updatedMs: Number.isFinite(snapshot.timestampMs) ? snapshot.timestampMs : Date.now(),
@@ -1516,7 +2085,9 @@ class VictronHouseControl extends utils.Adapter {
                         if (result.error) {
                             errors.push(`${profile.key}: ${this.formatScanError(result.error)}`);
                             if (this.isUnitTimeoutError(result.error)) {
-                                this.log.debug(`Scan Unit-ID ${unitId}: ${this.formatScanError(result.error)}; continuing with next Unit-ID`);
+                                this.log.debug(
+                                    `Scan Unit-ID ${unitId}: ${this.formatScanError(result.error)}; continuing with next Unit-ID`
+                                );
                                 break;
                             }
                         }
@@ -1524,17 +2095,25 @@ class VictronHouseControl extends utils.Adapter {
                 } catch (error) {
                     if (this.isShutdownError(error)) break;
                     errors.push(`unexpected: ${this.formatScanError(error)}`);
-                    this.log.debug(`Scan Unit-ID ${unitId}: unexpected error ${this.formatScanError(error)}; continuing with next Unit-ID`);
+                    this.log.debug(
+                        `Scan Unit-ID ${unitId}: unexpected error ${this.formatScanError(error)}; continuing with next Unit-ID`
+                    );
                 }
 
                 if (this.isStopping) break;
                 if (foundForUnit > 0) {
-                    this.log.debug(`Scan Unit-ID ${unitId}: finished, detected ${foundForUnit} profile(s) in ${Date.now() - unitStarted} ms`);
+                    this.log.debug(
+                        `Scan Unit-ID ${unitId}: finished, detected ${foundForUnit} profile(s) in ${Date.now() - unitStarted} ms`
+                    );
                 } else if (errors.length > 0) {
                     const uniqueErrors = Array.from(new Set(errors)).slice(0, 4).join('; ');
-                    this.log.debug(`Scan Unit-ID ${unitId}: no matching profile detected in ${Date.now() - unitStarted} ms; ${uniqueErrors}`);
+                    this.log.debug(
+                        `Scan Unit-ID ${unitId}: no matching profile detected in ${Date.now() - unitStarted} ms; ${uniqueErrors}`
+                    );
                 } else {
-                    this.log.debug(`Scan Unit-ID ${unitId}: no matching profile detected in ${Date.now() - unitStarted} ms`);
+                    this.log.debug(
+                        `Scan Unit-ID ${unitId}: no matching profile detected in ${Date.now() - unitStarted} ms`
+                    );
                 }
             }
 
@@ -1547,7 +2126,9 @@ class VictronHouseControl extends utils.Adapter {
             if (added > 0) {
                 await this.pollOnce();
             }
-            this.log.debug(`Device scan finished: checked ${checkedUnits}/${candidates.length} Unit-ID(s), added ${added} profile(s) in ${Date.now() - started} ms`);
+            this.log.debug(
+                `Device scan finished: checked ${checkedUnits}/${candidates.length} Unit-ID(s), added ${added} profile(s) in ${Date.now() - started} ms`
+            );
         } catch (error) {
             if (this.isShutdownError(error)) {
                 this.log.debug(`Device scan stopped during shutdown: ${error.message}`);
@@ -1559,9 +2140,13 @@ class VictronHouseControl extends utils.Adapter {
         }
     }
 
-    normalizeUnitIdList(value, extraIds = [], fallback = '100,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247') {
+    normalizeUnitIdList(
+        value,
+        extraIds = [],
+        fallback = '100,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247'
+    ) {
         const ids = new Set();
-        const add = entry => {
+        const add = (entry) => {
             const n = Number(String(entry).trim());
             if (Number.isInteger(n) && n >= 0 && n <= 255) ids.add(n);
         };
@@ -1573,7 +2158,9 @@ class VictronHouseControl extends utils.Adapter {
             for (const entry of String(fallback).split(',')) add(entry);
         }
 
-        return Array.from(ids).sort((a, b) => a - b).join(',');
+        return Array.from(ids)
+            .sort((a, b) => a - b)
+            .join(',');
     }
 
     parseUnitIdList(value) {
@@ -1584,7 +2171,9 @@ class VictronHouseControl extends utils.Adapter {
         }
         ids.add(this.config.unitIdSystem);
         ids.add(this.config.controlUnitId);
-        return Array.from(ids).filter(id => id >= 0 && id <= 255).sort((a, b) => a - b);
+        return Array.from(ids)
+            .filter((id) => id >= 0 && id <= 255)
+            .sort((a, b) => a - b);
     }
 
     buildScanCandidates() {
@@ -1606,100 +2195,490 @@ class VictronHouseControl extends utils.Adapter {
         if (this.isStopping) return;
         const unitChannel = `devices.unit_${unitId}`;
         const profileChannel = `${unitChannel}.${profile.key}`;
-        await this.ensureChannelObject(unitChannel, `Victron Gerät Unit-ID ${unitId}`, `Automatisch erkannter Victron-Dienst mit Modbus Unit-ID ${unitId}.`, { unitId });
+        await this.ensureChannelObject(
+            unitChannel,
+            t(`Victron device Unit-ID ${unitId}`, `Victron Gerät Unit-ID ${unitId}`),
+            t(
+                `Automatically detected Victron service on Modbus Unit-ID ${unitId}.`,
+                `Automatisch erkannter Victron-Dienst mit Modbus Unit-ID ${unitId}.`
+            ),
+            { unitId }
+        );
         if (this.isStopping) return;
-        await this.ensureChannelObject(profileChannel, profile.name, `Automatisch erkanntes Victron-Profil: ${profile.name}.`, { unitId, profile: profile.key });
+        await this.ensureChannelObject(
+            profileChannel,
+            profile.name,
+            t(
+                `Automatically detected Victron profile: ${profile.name}.`,
+                `Automatisch erkanntes Victron-Profil: ${profile.name}.`
+            ),
+            { unitId, profile: profile.key }
+        );
         for (const definition of profile.registers) {
             if (this.isStopping) return;
-            await this.ensureStateObject(`${profileChannel}.${definition.id}`, definition, false, {
+            const objectId = `${profileChannel}.${definition.id}`;
+            await this.ensureStateObject(objectId, definition, Boolean(definition.write), {
                 unitId,
                 address: definition.address,
                 type: definition.type,
                 scale: definition.scale
             });
+            if (definition.write) await this.registerWritableState(objectId, unitId, definition);
         }
     }
 
     async onStateChange(id, state) {
+        if (id && id === this.config.forecastTodayStateId) {
+            this.applyForecast(state);
+            return;
+        }
         if (!state || state.ack) return;
+        const entry = this.writableStates.get(id);
+        if (!entry) return;
 
+        // Make sure the next poll writes the real device value again (with ack=true),
+        // even if it did not change, so a rejected command does not stay visible.
+        this.stateCache.delete(entry.objectId);
         try {
-            const relativeId = id.startsWith(`${this.namespace}.`) ? id.substring(this.namespace.length + 1) : id;
-            if (relativeId.startsWith('controls.')) {
-                await this.handleControlState(id, state.val);
-                return;
-            }
-            if (relativeId === `${this.rawPrefix}.execute` && state.val === true) {
-                await this.handleRawWrite();
-                await this.setStateAsync(this.rawPrefix + '.execute', false, true);
-            }
+            await this.handleWrite(entry, state.val);
         } catch (error) {
-            this.log.error(`State change handling failed for ${id}: ${error.message}`);
-            await this.setStateAsync('status.lastError', error.message, true);
+            this.log.error(`Write to ${id} failed: ${error.message}`);
+            await this.safeSetStateAsync(
+                'status.lastError',
+                `Write to ${entry.objectId} failed: ${error.message}`,
+                true
+            );
         }
     }
 
-    async handleControlState(fullId, value) {
-        const definition = this.controlByStateId.get(fullId);
-        if (!definition || !definition.write) return;
-
+    /**
+     * Writes a value to the Modbus register behind a writable state.
+     *
+     * @param {{objectId: string, unitId: number, definition: any}} entry writable state entry
+     * @param {any} value value written by the user (scaled, as shown in ioBroker)
+     */
+    async handleWrite(entry, value) {
+        const { objectId, unitId, definition } = entry;
         if (!this.config.allowWrites) {
-            this.log.warn(`Write blocked for ${fullId}. Enable writes in adapter settings first.`);
-            await this.setStateAsync('status.lastError', 'Write blocked: allowWrites is disabled', true);
-            await this.pollOnce();
+            this.log.warn(
+                `Write to ${objectId} blocked. Enable "Allow write commands" in the instance settings first.`
+            );
+            await this.safeSetStateAsync('status.lastError', `Write blocked: writing is disabled (${objectId})`, true);
             return;
         }
+        if (!this.client) throw new Error('Modbus client not available');
 
-        if (definition.id.includes('setpoint') || definition.id.includes('power')) {
+        if (!definition.boolean) {
             const numeric = Number(value);
-            if (Number.isFinite(numeric) && (numeric < this.config.writeSafetyMinW || numeric > this.config.writeSafetyMaxW)) {
-                throw new Error(`Write blocked: ${numeric} W is outside safety range ${this.config.writeSafetyMinW}..${this.config.writeSafetyMaxW} W`);
+            if (!Number.isFinite(numeric)) throw new Error(`Value '${value}' is not numeric`);
+            if (typeof definition.min === 'number' && numeric < definition.min)
+                throw new Error(`Value ${numeric} is below minimum ${definition.min}`);
+            if (typeof definition.max === 'number' && numeric > definition.max)
+                throw new Error(`Value ${numeric} is above maximum ${definition.max}`);
+            if (
+                definition.unit === 'W' &&
+                (numeric < this.config.writeSafetyMinW || numeric > this.config.writeSafetyMaxW)
+            ) {
+                throw new Error(
+                    `${numeric} W is outside the safety range ${this.config.writeSafetyMinW}..${this.config.writeSafetyMaxW} W`
+                );
             }
         }
 
         const registers = encodeValue(value, definition);
         if (registers.length === 1) {
-            await this.client.writeSingleRegister(this.config.controlUnitId, definition.address, registers[0]);
+            await this.client.writeSingleRegister(unitId, definition.address, registers[0]);
         } else {
-            await this.client.writeMultipleRegisters(this.config.controlUnitId, definition.address, registers);
+            await this.client.writeMultipleRegisters(unitId, definition.address, registers);
         }
 
-        await this.setStateAsync(fullId.substring(this.namespace.length + 1), value, true);
-        await this.setStateAsync('status.lastError', '', true);
-        this.log.info(`Wrote ${value} to Unit-ID ${this.config.controlUnitId}, register ${definition.address} (${definition.id})`);
+        const ackValue = definition.boolean
+            ? value === true || value === 'true' || value === 1 || value === '1'
+            : Number(value);
+        await this.safeSetStateAsync(objectId, ackValue, true);
+        await this.safeSetStateAsync('status.lastError', '', true);
+        this.log.info(`Wrote ${value} to Unit-ID ${unitId}, register ${definition.address} (${objectId})`);
     }
 
-    async handleRawWrite() {
-        if (!this.config.autoCreateRawWriteObjects) return;
-        if (!this.config.allowWrites) {
-            this.log.warn('Raw write blocked. Enable writes in adapter settings first.');
-            await this.setStateAsync('status.lastError', 'Raw write blocked: allowWrites is disabled', true);
+    // ------------------------------------------------------------------
+    // Energy statistics (today / month / year, day curve, history)
+    // ------------------------------------------------------------------
+
+    static get STAT_FIELDS() {
+        return {
+            pv: ['PV yield', 'PV-Ertrag'],
+            consumption: ['Consumption', 'Verbrauch'],
+            gridImport: ['Grid import', 'Netzbezug'],
+            gridExport: ['Grid feed-in', 'Einspeisung'],
+            batteryCharge: ['Battery charged', 'Akku geladen'],
+            batteryDischarge: ['Battery discharged', 'Akku entladen'],
+            ev: ['EV charger', 'Wallbox']
+        };
+    }
+
+    static statKey(key) {
+        return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+    }
+
+    async createStatisticsObjects() {
+        await this.ensureChannelObject(
+            'statistics',
+            t('Energy statistics', 'Energiestatistik'),
+            t(
+                'Energy values integrated by the adapter from the live power values.',
+                'Vom Adapter aus den Live-Leistungen aufsummierte Energiewerte.'
+            )
+        );
+        const periods = {
+            today: ['today', 'heute'],
+            month: ['current month', 'aktueller Monat'],
+            year: ['current year', 'aktuelles Jahr']
+        };
+        for (const [period, [periodEn, periodDe]] of Object.entries(periods)) {
+            await this.ensureChannelObject(
+                `statistics.${period}`,
+                t(`Statistics ${periodEn}`, `Statistik ${periodDe}`),
+                t('', '')
+            );
+            for (const [key, [en, de]] of Object.entries(VictronAdapter.STAT_FIELDS)) {
+                await this.ensureStateObject(
+                    `statistics.${period}.${VictronAdapter.statKey(key)}_kwh`,
+                    {
+                        id: key,
+                        nameEn: `${en} ${periodEn}`,
+                        name: `${de} ${periodDe}`,
+                        nameDe: `${de} ${periodDe}`,
+                        descriptionEn: `${en} ${periodEn} in kWh.`,
+                        descriptionDe: `${de} ${periodDe} in kWh.`,
+                        type: 'number',
+                        role: 'value.energy',
+                        unit: 'kWh'
+                    },
+                    false
+                );
+            }
+            const extra = [
+                ['autarky_percent', 'Self-sufficiency', 'Autarkie', '%', 'value'],
+                ['self_consumption_percent', 'Self-consumption rate', 'Eigenverbrauchsquote', '%', 'value'],
+                ['savings_eur', 'Savings', 'Ersparnis', '€', 'value'],
+                ['savings_self_eur', 'Savings from self-consumption', 'Ersparnis durch Eigenverbrauch', '€', 'value'],
+                ['savings_export_eur', 'Feed-in revenue', 'Einspeisevergütung', '€', 'value']
+            ];
+            for (const [id, en, de, unit, role] of extra) {
+                await this.ensureStateObject(
+                    `statistics.${period}.${id}`,
+                    {
+                        id,
+                        nameEn: `${en} ${periodEn}`,
+                        name: `${de} ${periodDe}`,
+                        nameDe: `${de} ${periodDe}`,
+                        descriptionEn: `${en} ${periodEn}.`,
+                        descriptionDe: `${de} ${periodDe}.`,
+                        type: 'number',
+                        role,
+                        unit
+                    },
+                    false
+                );
+            }
+        }
+        await this.ensureStateObject(
+            'statistics.vrm_status',
+            {
+                id: 'vrm_status',
+                nameEn: 'VRM import status',
+                name: 'VRM-Import Status',
+                nameDe: 'VRM-Import Status',
+                descriptionEn: 'Result of the last history import from the VRM portal.',
+                descriptionDe: 'Ergebnis des letzten Historien-Imports aus dem VRM-Portal.',
+                type: 'string',
+                role: 'text'
+            },
+            false
+        );
+        await this.ensureStateObject(
+            'statistics.vrm_last_sync',
+            {
+                id: 'vrm_last_sync',
+                nameEn: 'VRM last import',
+                name: 'VRM letzter Import',
+                nameDe: 'VRM letzter Import',
+                descriptionEn: 'Time of the last successful VRM import.',
+                descriptionDe: 'Zeitpunkt des letzten erfolgreichen VRM-Imports.',
+                type: 'string',
+                role: 'date'
+            },
+            false
+        );
+        const jsonStates = [
+            [
+                'day_curve_json',
+                'Day curve (5 min)',
+                'Tagesverlauf (5 min)',
+                'PV, consumption, grid and battery SoC of today in 5 minute steps.',
+                'PV, Verbrauch, Netz und Akku-Ladezustand von heute in 5-Minuten-Schritten.'
+            ],
+            [
+                'history_json',
+                'Daily history',
+                'Tageshistorie',
+                'Daily energy values of the last 400 days.',
+                'Tägliche Energiewerte der letzten 400 Tage.'
+            ],
+            [
+                'storage_json',
+                'Internal storage',
+                'Interner Speicher',
+                'Internal state of the statistics (restored after a restart).',
+                'Interner Zustand der Statistik (wird nach einem Neustart wiederhergestellt).'
+            ]
+        ];
+        for (const [id, en, de, descEn, descDe] of jsonStates) {
+            await this.ensureStateObject(
+                `statistics.${id}`,
+                {
+                    id,
+                    nameEn: en,
+                    name: de,
+                    nameDe: de,
+                    descriptionEn: descEn,
+                    descriptionDe: descDe,
+                    type: 'string',
+                    role: 'json'
+                },
+                false
+            );
+        }
+    }
+
+    async restoreStatistics() {
+        try {
+            const state = await this.getStateAsync('statistics.storage_json');
+            if (state && typeof state.val === 'string' && state.val) {
+                this.stats.restore(JSON.parse(state.val), Date.now());
+                this.log.debug(`Statistics restored (${this.stats.history.length} days of history)`);
+            }
+        } catch (error) {
+            this.log.warn(`Could not restore statistics: ${error.message}`);
+        }
+    }
+
+    /**
+     * @param {any} snapshot dashboard snapshot of the current poll
+     */
+    async updateStatistics(snapshot) {
+        if (this.isStopping) return;
+        const now = Number.isFinite(snapshot.timestampMs) ? snapshot.timestampMs : Date.now();
+        const newDay = this.stats.update(
+            {
+                pv: snapshot.pv.total,
+                consumption: snapshot.loads.houseTotal,
+                grid: snapshot.grid.total,
+                battery: snapshot.battery.power,
+                ev: snapshot.ev ? snapshot.ev.power : null,
+                soc: snapshot.battery.soc
+            },
+            now
+        );
+        // Statistics change slowly: write them once per minute (and immediately after midnight).
+        if (!newDay && now - this.lastStatsWrite < 60000) return;
+        this.lastStatsWrite = now;
+        await this.writeStatistics();
+        if (newDay || now - this.lastStatsPersist >= 5 * 60000) {
+            this.lastStatsPersist = now;
+            await this.safeSetStateAsync('statistics.storage_json', JSON.stringify(this.stats.toJSON()), true);
+        }
+    }
+
+    async writeStatistics() {
+        const prices = { priceImport: this.config.priceImport, priceExport: this.config.priceExport };
+        const periods = this.stats.periods();
+        for (const [period, energy] of Object.entries(periods)) {
+            for (const key of ENERGY_KEYS) {
+                await this.safeSetStateAsync(
+                    `statistics.${period}.${VictronAdapter.statKey(key)}_kwh`,
+                    energy[key],
+                    true
+                );
+            }
+            const figures = EnergyStatistics.figures(energy, prices);
+            await this.safeSetStateAsync(`statistics.${period}.autarky_percent`, figures.autarky, true);
+            await this.safeSetStateAsync(
+                `statistics.${period}.self_consumption_percent`,
+                figures.selfConsumption,
+                true
+            );
+            await this.safeSetStateAsync(`statistics.${period}.savings_eur`, figures.savings, true);
+            await this.safeSetStateAsync(`statistics.${period}.savings_self_eur`, figures.savingsSelf, true);
+            await this.safeSetStateAsync(`statistics.${period}.savings_export_eur`, figures.savingsExport, true);
+        }
+        await this.safeSetStateAsync('statistics.day_curve_json', JSON.stringify(this.stats.curveCompact()), true);
+        await this.safeSetStateAsync('statistics.history_json', JSON.stringify(this.stats.historyCompact()), true);
+    }
+
+    // ------------------------------------------------------------------
+    // History import from the VRM portal (the GX has no history via Modbus)
+    // ------------------------------------------------------------------
+
+    setupVrmSync() {
+        if (!this.config.vrmEnabled) {
+            this.safeSetStateAsync('statistics.vrm_status', 'disabled', true).catch(() => undefined);
             return;
         }
+        if (!this.config.vrmToken || !/^\d+$/.test(this.config.vrmSiteId)) {
+            this.log.warn('VRM import is enabled, but the access token or the installation id is missing.');
+            this.safeSetStateAsync('statistics.vrm_status', 'Access token or installation id missing', true).catch(
+                () => undefined
+            );
+            return;
+        }
+        // first sync shortly after start, then every 3 hours
+        this.vrmTimer = this.setTimeout(() => this.syncVrm(), 15000);
+        this.vrmInterval = this.setInterval(() => this.syncVrm(), 3 * 3600 * 1000);
+    }
 
-        const [unitIdState, addressState, valueState] = await Promise.all([
-            this.getStateAsync(`${this.rawPrefix}.unitId`),
-            this.getStateAsync(`${this.rawPrefix}.address`),
-            this.getStateAsync(`${this.rawPrefix}.value`)
-        ]);
-        const unitId = Number(unitIdState && unitIdState.val);
-        const address = Number(addressState && addressState.val);
-        const value = Number(valueState && valueState.val);
-        if (![unitId, address, value].every(Number.isFinite)) {
-            throw new Error('Raw write requires numeric unitId, address and value');
+    async syncVrm() {
+        if (this.isStopping || this.vrmBusy) return;
+        this.vrmBusy = true;
+        try {
+            const fullImport = this.stats.history.length < 300 && !this.vrmFullDone;
+            const days = fullImport ? 400 : 4;
+            const result = await fetchVrmDays({ token: this.config.vrmToken, siteId: this.config.vrmSiteId, days });
+            if (this.isStopping) return;
+            const count = this.stats.importDays(result, Date.now());
+            if (fullImport) this.vrmFullDone = true;
+            await this.writeStatistics();
+            await this.safeSetStateAsync('statistics.storage_json', JSON.stringify(this.stats.toJSON()), true);
+            await this.safeSetStateAsync('statistics.vrm_status', `OK – ${count} days imported`, true);
+            await this.safeSetStateAsync('statistics.vrm_last_sync', new Date().toISOString(), true);
+            this.log.info(`VRM import: ${count} days imported (${days} days requested)`);
+        } catch (error) {
+            if (this.isStopping) return;
+            this.log.warn(`VRM import failed: ${error.message}`);
+            await this.safeSetStateAsync('statistics.vrm_status', `Error: ${error.message}`, true);
+        } finally {
+            this.vrmBusy = false;
         }
-        if (value < 0 || value > 65535) {
-            throw new Error('Raw write value must be 0..65535');
+    }
+
+    // ------------------------------------------------------------------
+    // PV forecast from another adapter (e.g. pvforecast, solcast)
+    // ------------------------------------------------------------------
+
+    async setupForecast() {
+        const id = this.config.forecastTodayStateId;
+        if (!id) return;
+        try {
+            await this.subscribeForeignStatesAsync(id);
+            const state = await this.getForeignStateAsync(id);
+            this.applyForecast(state);
+            this.log.info(`PV forecast is read from ${id}`);
+        } catch (error) {
+            this.log.warn(`PV forecast state ${id} could not be read: ${error.message}`);
         }
-        await this.client.writeSingleRegister(unitId, address, value);
-        this.log.info(`Raw wrote value ${value} to Unit-ID ${unitId}, register ${address}`);
+    }
+
+    /**
+     * @param {any} state forecast state
+     */
+    applyForecast(state) {
+        const value = state ? Number(state.val) : NaN;
+        this.forecastTodayKwh = Number.isFinite(value)
+            ? this.config.forecastUnit === 'Wh'
+                ? value / 1000
+                : value
+            : null;
+    }
+
+    // ------------------------------------------------------------------
+    // Additional dashboard values: alarms, battery details, forecast
+    // ------------------------------------------------------------------
+
+    collectAlarms() {
+        const alarms = [];
+        for (const [key, value] of this.lastValues.entries()) {
+            const match = String(key).match(/^devices\.unit_(\d+)\.([^.]+)\.(.+)$/);
+            if (!match || !Number.isFinite(value) || value <= 0) continue;
+            const [, unit, profileKey, stateId] = match;
+            const isAlarm = /alarm$/.test(stateId) && !/alarms$/.test(stateId);
+            const isError = /^(error_code|ve_bus_error)$/.test(stateId);
+            if (!isAlarm && !isError) continue;
+            const profile = DEVICE_PROFILES.find((entry) => entry.key === profileKey);
+            const definition = profile && profile.registers.find((entry) => entry.id === stateId);
+            alarms.push({
+                id: `${profileKey}.${stateId}`,
+                unit: Number(unit),
+                device: profile ? profile.name : profileKey,
+                name: definition ? definition.name : stateId,
+                level: isError ? 2 : value >= 2 ? 2 : 1,
+                value
+            });
+        }
+        return alarms;
+    }
+
+    /**
+     * @param {any} snapshot dashboard snapshot of the current poll
+     */
+    async updateDashboardExtras(snapshot) {
+        if (this.isStopping) return;
+        const alarms = this.collectAlarms();
+        const level = alarms.reduce((max, alarm) => Math.max(max, alarm.level), 0);
+        await this.safeSetStateAsync('dashboard.alarm_count', alarms.length, true);
+        await this.safeSetStateAsync('dashboard.alarm_level', level, true);
+        await this.safeSetStateAsync('dashboard.alarms_json', JSON.stringify(alarms), true);
+
+        const soc = snapshot.battery.soc;
+        const power = snapshot.battery.power;
+        const capacity =
+            this.config.batteryCapacityKwh > 0
+                ? this.config.batteryCapacityKwh
+                : this.lastValues.get('controls.dynamic_ess_battery_capacity_kwh') || null;
+        let toFull = null;
+        if (Number.isFinite(soc) && Number.isFinite(power) && power > 50 && soc < 100 && capacity > 0) {
+            toFull = Math.round(((((100 - soc) / 100) * capacity * 1000) / power) * 60);
+        }
+        let toGo = null;
+        const systemToGo = this.lastValues.get('system.battery_time_to_go_s');
+        const deviceToGo = this._firstDeviceValue('battery', 'time_to_go');
+        const seconds = Number.isFinite(systemToGo) && systemToGo > 0 ? systemToGo : deviceToGo;
+        if (Number.isFinite(power) && power < -50) {
+            if (Number.isFinite(seconds) && seconds > 0) {
+                toGo = Math.round(seconds / 60);
+            } else if (Number.isFinite(soc) && capacity > 0) {
+                toGo = Math.round((((soc / 100) * capacity * 1000) / -power) * 60);
+            }
+        }
+        await this.safeSetStateAsync('dashboard.battery_time_to_full_min', toFull, true);
+        await this.safeSetStateAsync('dashboard.battery_time_to_go_min', toGo, true);
+        await this.safeSetStateAsync('dashboard.battery_capacity_kwh', capacity || null, true);
+        await this.safeSetStateAsync(
+            'dashboard.battery_soh',
+            this._roundForSnapshot(this._firstDeviceValue('battery', 'state_of_health')),
+            true
+        );
+        await this.safeSetStateAsync(
+            'dashboard.battery_cycles',
+            this._roundForSnapshot(this._firstDeviceValue('battery', 'charge_cycles')),
+            true
+        );
+        await this.safeSetStateAsync(
+            'dashboard.pv_forecast_today_kwh',
+            this.forecastTodayKwh === null ? null : Math.round(this.forecastTodayKwh * 100) / 100,
+            true
+        );
     }
 
     onUnload(callback) {
         try {
+            if (this.stats && this.stats.today.date) {
+                this.setState('statistics.storage_json', JSON.stringify(this.stats.toJSON()), true);
+            }
             this.isStopping = true;
             this.clearTimer('pollTimer');
             this.clearTimer('scanTimer');
+            if (this.vrmTimer) this.clearTimeout(this.vrmTimer);
+            if (this.vrmInterval) this.clearInterval(this.vrmInterval);
             if (this.client) {
                 this.client.destroy();
                 this.client = null;
@@ -1713,7 +2692,7 @@ class VictronHouseControl extends utils.Adapter {
 }
 
 if (require.main !== module) {
-    module.exports = options => new VictronHouseControl(options);
+    module.exports = (options) => new VictronAdapter(options);
 } else {
-    new VictronHouseControl();
+    new VictronAdapter();
 }

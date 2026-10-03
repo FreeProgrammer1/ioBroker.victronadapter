@@ -38,7 +38,7 @@ jobs:
           os: ${{ matrix.os }}
           install-command: "npm install"
           unit-test-command: "npm run test:unit"
-          integration-test-command: "npm run test:package"
+          integration-test-command: "npm run test:integration"
 
   deploy:
     needs:

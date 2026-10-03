@@ -1,26 +1,16 @@
-import js from "@eslint/js";
-import iobroker from "@iobroker/eslint-config";
+// ioBroker eslint template configuration file for js and ts files
+import config from '@iobroker/eslint-config';
 
 export default [
-    js.configs.recommended,
-    ...iobroker,
+    ...config,
     {
-        languageOptions: {
-            ecmaVersion: 2022,
-            sourceType: "commonjs",
-            globals: {
-                module: "readonly",
-                require: "readonly",
-                __dirname: "readonly",
-                Buffer: "readonly",
-                console: "readonly",
-                customElements: "readonly",
-                HTMLElement: "readonly",
-                window: "readonly"
-            }
-        },
+        // Lovelace custom card runs in the browser and is not part of the adapter runtime
+        ignores: ['lovelace/**', 'admin/**', 'test/**/*.js', '**/*.test.js', '.dev-server/', 'node_modules/']
+    },
+    {
         rules: {
-            "no-console": "off"
+            'jsdoc/require-jsdoc': 'off',
+            'jsdoc/require-param-description': 'off'
         }
     }
 ];

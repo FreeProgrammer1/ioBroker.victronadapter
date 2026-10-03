@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "victronadapter",
-    "version": "0.6.13",
+    "version": "0.9.0",
     "titleLang": {
       "en": "Victron",
       "de": "Victron",
@@ -68,6 +68,71 @@
       }
     ],
     "news": {
+      "0.9.0": {
+        "en": "History import from the Victron VRM portal: daily PV, consumption, grid and battery values of the last 400 days (the GX provides no history via Modbus). Requires a VRM access token and the installation id.",
+        "de": "Historien-Import aus dem Victron-VRM-Portal: tägliche Werte für PV, Verbrauch, Netz und Akku der letzten 400 Tage (der GX liefert über Modbus keine Historie). Benötigt ein VRM-Zugriffstoken und die Installations-ID.",
+        "ru": "Импорт истории из портала Victron VRM: суточные значения PV, потребления, сети и аккумулятора за последние 400 дней. Требуется токен доступа VRM и ID установки.",
+        "pt": "Importação do histórico do portal Victron VRM: valores diários de PV, consumo, rede e bateria dos últimos 400 dias. Requer token de acesso VRM e ID da instalação.",
+        "nl": "Historie-import uit het Victron VRM-portaal: dagwaarden voor PV, verbruik, net en accu van de laatste 400 dagen. Vereist een VRM-toegangstoken en de installatie-ID.",
+        "fr": "Import de l'historique depuis le portail Victron VRM : valeurs journalières PV, consommation, réseau et batterie des 400 derniers jours. Nécessite un jeton d'accès VRM et l'ID d'installation.",
+        "it": "Importazione dello storico dal portale Victron VRM: valori giornalieri di FV, consumo, rete e batteria degli ultimi 400 giorni. Richiede un token di accesso VRM e l’ID impianto.",
+        "es": "Importación del historial desde el portal Victron VRM: valores diarios de FV, consumo, red y batería de los últimos 400 días. Requiere un token de acceso VRM y el ID de instalación.",
+        "pl": "Import historii z portalu Victron VRM: dzienne wartości PV, zużycia, sieci i akumulatora z ostatnich 400 dni. Wymaga tokenu dostępu VRM i ID instalacji.",
+        "uk": "Імпорт історії з порталу Victron VRM: добові значення PV, споживання, мережі та акумулятора за останні 400 днів. Потрібен токен доступу VRM та ID установки.",
+        "zh-cn": "从 Victron VRM 门户导入历史：最近 400 天的光伏、用电、电网和电池每日数值。需要 VRM 访问令牌和安装 ID。"
+      },
+      "0.8.1": {
+        "en": "Lovelace cards find their values even if Lovelace names the entities differently, and show a diagnosis when values are missing.",
+        "de": "Die Lovelace-Karten finden ihre Werte auch bei abweichend benannten Entitäten und zeigen eine Diagnose, wenn Werte fehlen.",
+        "ru": "Карты Lovelace находят значения даже при других именах сущностей и показывают диагностику, если значения отсутствуют.",
+        "pt": "Os cartões Lovelace encontram os valores mesmo com entidades com outro nome e mostram um diagnóstico quando faltam valores.",
+        "nl": "De Lovelace-kaarten vinden hun waarden ook bij anders benoemde entiteiten en tonen een diagnose als waarden ontbreken.",
+        "fr": "Les cartes Lovelace trouvent leurs valeurs même si les entités sont nommées différemment et affichent un diagnostic en cas de valeurs manquantes.",
+        "it": "Le schede Lovelace trovano i valori anche con entità denominate diversamente e mostrano una diagnosi se mancano valori.",
+        "es": "Las tarjetas Lovelace encuentran sus valores aunque las entidades tengan otro nombre y muestran un diagnóstico si faltan valores.",
+        "pl": "Karty Lovelace znajdują wartości także przy inaczej nazwanych encjach i pokazują diagnozę, gdy brakuje wartości.",
+        "uk": "Картки Lovelace знаходять значення навіть за інших назв сутностей і показують діагностику, якщо значень бракує.",
+        "zh-cn": "即使实体命名不同，Lovelace 卡片也能找到数值，并在缺少数值时显示诊断信息。"
+      },
+      "0.8.0": {
+        "en": "Energy dashboard: statistics for today/month/year (PV, consumption, grid, battery, EV), self-sufficiency, self-consumption and savings, day curve and 400-day history, alarms, battery time to full/time to go, PV forecast. 9 new Lovelace cards (today, battery, day curve, history, status, surplus traffic light, Dynamic ESS, control with confirmation, mini tile), visual card editor, German/English, extra consumers and tap details in the flow card.",
+        "de": "Energie-Dashboard: Statistik für heute/Monat/Jahr (PV, Verbrauch, Netz, Akku, Wallbox), Autarkie, Eigenverbrauch und Ersparnis, Tagesverlauf und 400-Tage-Historie, Alarme, Akku voll in / Restlaufzeit, PV-Prognose. 9 neue Lovelace-Karten (Heute, Akku, Tagesverlauf, Historie, Status, Überschuss-Ampel, Dynamic ESS, Steuerung mit Sicherheitsabfrage, Mini-Kachel), grafischer Karten-Editor, Deutsch/Englisch, weitere Verbraucher und Details per Antippen in der Flusskarte.",
+        "ru": "Энергетическая панель: статистика за день/месяц/год, автономность, собственное потребление и экономия, суточный график и история за 400 дней, аварии, время до полной зарядки/разрядки аккумулятора, прогноз PV. 9 новых карт Lovelace, визуальный редактор, немецкий/английский язык.",
+        "pt": "Painel de energia: estatísticas de hoje/mês/ano, autossuficiência, autoconsumo e poupança, curva diária e histórico de 400 dias, alarmes, tempo até bateria cheia/autonomia, previsão PV. 9 novos cartões Lovelace, editor visual, alemão/inglês.",
+        "nl": "Energiedashboard: statistieken voor vandaag/maand/jaar, zelfvoorziening, eigen verbruik en besparing, dagverloop en historie van 400 dagen, alarmen, accu vol over/resterende tijd, PV-prognose. 9 nieuwe Lovelace-kaarten, visuele editor, Duits/Engels.",
+        "fr": "Tableau de bord énergie : statistiques jour/mois/année, autonomie, autoconsommation et économies, courbe journalière et historique de 400 jours, alarmes, batterie pleine dans/autonomie, prévision PV. 9 nouvelles cartes Lovelace, éditeur visuel, allemand/anglais.",
+        "it": "Dashboard energia: statistiche di oggi/mese/anno, autosufficienza, autoconsumo e risparmio, andamento giornaliero e storico di 400 giorni, allarmi, batteria piena tra/autonomia, previsione FV. 9 nuove schede Lovelace, editor visuale, tedesco/inglese.",
+        "es": "Panel de energía: estadísticas de hoy/mes/año, autosuficiencia, autoconsumo y ahorro, curva diaria e historial de 400 días, alarmas, batería llena en/autonomía, previsión FV. 9 nuevas tarjetas Lovelace, editor visual, alemán/inglés.",
+        "pl": "Panel energii: statystyki dzień/miesiąc/rok, autarkia, autokonsumpcja i oszczędności, przebieg dzienny i historia 400 dni, alarmy, akumulator pełny za/czas pracy, prognoza PV. 9 nowych kart Lovelace, edytor wizualny, niemiecki/angielski.",
+        "uk": "Енергетична панель: статистика за день/місяць/рік, автономність, власне споживання та економія, добовий графік та історія за 400 днів, аварії, час до повного заряду/розряду акумулятора, прогноз PV. 9 нових карток Lovelace, візуальний редактор, німецька/англійська.",
+        "zh-cn": "能源仪表板：今日/本月/本年统计、自给率、自用率和节省金额、日曲线和 400 天历史、告警、电池充满/剩余时间、光伏预测。9 个新的 Lovelace 卡片、可视化编辑器、德语/英语。"
+      },
+      "0.7.1": {
+        "en": "New Lovelace card \"custom:victronadapter-flow-hub\": PV, house, grid, EV charger and battery around a central hub with progress rings and animated energy flow. New state dashboard.ev_power.",
+        "de": "Neue Lovelace-Karte \"custom:victronadapter-flow-hub\": PV, Haus, Netz, Wallbox und Akku um einen Mittelpunkt mit Fortschrittsringen und animiertem Energiefluss. Neuer Datenpunkt dashboard.ev_power.",
+        "ru": "Новая карта Lovelace \"custom:victronadapter-flow-hub\": PV, дом, сеть, зарядная станция и аккумулятор вокруг центра с кольцами прогресса и анимированным потоком энергии. Новое состояние dashboard.ev_power.",
+        "pt": "Novo cartão Lovelace \"custom:victronadapter-flow-hub\": PV, casa, rede, carregador EV e bateria à volta de um ponto central, com anéis de progresso e fluxo de energia animado. Novo estado dashboard.ev_power.",
+        "nl": "Nieuwe Lovelace-kaart \"custom:victronadapter-flow-hub\": PV, huis, net, laadpaal en accu rond een middelpunt met voortgangsringen en geanimeerde energiestroom. Nieuwe state dashboard.ev_power.",
+        "fr": "Nouvelle carte Lovelace « custom:victronadapter-flow-hub » : PV, maison, réseau, borne de recharge et batterie autour d’un point central avec anneaux de progression et flux d’énergie animé. Nouvel état dashboard.ev_power.",
+        "it": "Nuova scheda Lovelace \"custom:victronadapter-flow-hub\": FV, casa, rete, wallbox e batteria attorno a un punto centrale con anelli di avanzamento e flusso di energia animato. Nuovo stato dashboard.ev_power.",
+        "es": "Nueva tarjeta Lovelace \"custom:victronadapter-flow-hub\": FV, casa, red, cargador de VE y batería alrededor de un punto central con anillos de progreso y flujo de energía animado. Nuevo estado dashboard.ev_power.",
+        "pl": "Nowa karta Lovelace \"custom:victronadapter-flow-hub\": PV, dom, sieć, ładowarka EV i akumulator wokół punktu centralnego z pierścieniami postępu i animowanym przepływem energii. Nowy stan dashboard.ev_power.",
+        "uk": "Нова картка Lovelace \"custom:victronadapter-flow-hub\": PV, будинок, мережа, зарядна станція та акумулятор навколо центру з кільцями прогресу й анімованим потоком енергії. Новий стан dashboard.ev_power.",
+        "zh-cn": "新的 Lovelace 卡片 \"custom:victronadapter-flow-hub\"：光伏、住宅、电网、充电桩和电池围绕中心排列，带进度环和动画能量流。新增状态 dashboard.ev_power。"
+      },
+      "0.7.0": {
+        "en": "Writable registers are now regular states: GX relays, VE.Bus mode, ESS phase setpoints, solar charger on/off and EV charger controls. New table for own registers replaces the raw write channel (raw.* is removed). The Lovelace integration is optional, no longer restarts Lovelace and no longer deletes files. States are only written when their value changes. Several fixes (duplicate solar charger states, Dynamic ESS register overlap, shutdown handling).",
+        "de": "Beschreibbare Register sind jetzt normale Datenpunkte: GX-Relais, VE.Bus-Modus, ESS-Phasen-Sollwerte, Solarladeregler Ein/Aus und Wallbox-Steuerung. Eine neue Tabelle für eigene Register ersetzt den Roh-Schreibkanal (raw.* wird entfernt). Die Lovelace-Integration ist optional, startet Lovelace nicht mehr neu und löscht keine Dateien mehr. Datenpunkte werden nur noch bei Änderung geschrieben. Mehrere Fehlerkorrekturen (doppelte Solarladeregler-Datenpunkte, Überlappung Dynamic-ESS-Register, Beenden des Adapters).",
+        "ru": "Записываемые регистры теперь обычные состояния: реле GX, режим VE.Bus, уставки ESS по фазам, вкл/выкл солнечного контроллера и управление зарядной станцией. Новая таблица собственных регистров заменяет канал прямой записи (raw.* удаляется). Интеграция с Lovelace стала необязательной, больше не перезапускает Lovelace и не удаляет файлы. Состояния записываются только при изменении. Несколько исправлений.",
+        "pt": "Os registos graváveis são agora estados normais: relés GX, modo VE.Bus, setpoints ESS por fase, ligar/desligar do controlador solar e controlo do carregador EV. Uma nova tabela de registos próprios substitui o canal de escrita direta (raw.* é removido). A integração Lovelace é opcional, já não reinicia o Lovelace nem apaga ficheiros. Os estados só são escritos quando o valor muda. Várias correções.",
+        "nl": "Schrijfbare registers zijn nu gewone states: GX-relais, VE.Bus-modus, ESS-setpoints per fase, zonnelader aan/uit en laadpaalbesturing. Een nieuwe tabel voor eigen registers vervangt het ruwe schrijfkanaal (raw.* wordt verwijderd). De Lovelace-integratie is optioneel, herstart Lovelace niet meer en verwijdert geen bestanden meer. States worden alleen bij wijziging geschreven. Diverse correcties.",
+        "fr": "Les registres inscriptibles sont désormais des états normaux : relais GX, mode VE.Bus, consignes ESS par phase, marche/arrêt du régulateur solaire et commande de la borne de recharge. Un nouveau tableau de registres personnels remplace le canal d'écriture brute (raw.* est supprimé). L'intégration Lovelace est facultative, ne redémarre plus Lovelace et ne supprime plus de fichiers. Les états ne sont écrits qu'en cas de changement. Plusieurs corrections.",
+        "it": "I registri scrivibili sono ora stati normali: relè GX, modalità VE.Bus, setpoint ESS per fase, accensione/spegnimento del regolatore solare e controllo della wallbox. Una nuova tabella di registri propri sostituisce il canale di scrittura diretta (raw.* viene rimosso). L’integrazione Lovelace è facoltativa, non riavvia più Lovelace e non elimina più file. Gli stati vengono scritti solo quando cambiano. Diverse correzioni.",
+        "es": "Los registros escribibles son ahora estados normales: relés GX, modo VE.Bus, consignas ESS por fase, encendido/apagado del cargador solar y control del cargador de VE. Una nueva tabla de registros propios sustituye al canal de escritura directa (raw.* se elimina). La integración con Lovelace es opcional, ya no reinicia Lovelace ni borra archivos. Los estados solo se escriben cuando cambian. Varias correcciones.",
+        "pl": "Zapisywalne rejestry są teraz zwykłymi stanami: przekaźniki GX, tryb VE.Bus, nastawy ESS dla faz, włączanie/wyłączanie regulatora solarnego i sterowanie ładowarką EV. Nowa tabela własnych rejestrów zastępuje kanał surowego zapisu (raw.* jest usuwany). Integracja z Lovelace jest opcjonalna, nie restartuje już Lovelace i nie usuwa plików. Stany są zapisywane tylko przy zmianie. Kilka poprawek.",
+        "uk": "Записувані регістри тепер звичайні стани: реле GX, режим VE.Bus, уставки ESS за фазами, увімк./вимк. сонячного контролера та керування зарядною станцією. Нова таблиця власних регістрів замінює канал прямого запису (raw.* видаляється). Інтеграція з Lovelace необов’язкова, більше не перезапускає Lovelace і не видаляє файли. Стани записуються лише при зміні. Кілька виправлень.",
+        "zh-cn": "可写寄存器现在是普通状态：GX 继电器、VE.Bus 模式、ESS 分相设定值、太阳能控制器开关和充电桩控制。新的自定义寄存器表取代了原始写入通道（raw.* 已删除）。Lovelace 集成为可选项，不再重启 Lovelace，也不再删除文件。状态仅在数值变化时写入。多项修复。"
+      },
       "0.6.13": {
         "en": "Fixes the GitHub workflow metadata and adds a checker-compatible old changelog link while keeping Node.js 22 runtime metadata.",
         "de": "Korrigiert die GitHub-Workflow-Metadaten und ergänzt einen checker-kompatiblen Link auf das alte Changelog bei unveränderter Node.js-22-Laufzeitangabe.",
@@ -93,84 +158,6 @@
         "pl": "Czyści metadane wydania istotne dla checkera: silnik Node.js 22, macierz GitHub Actions z Node.js 20 i 22, changelog tylko w README, pełne tłumaczenia news i brak osobnych plików changelog w paczce.",
         "uk": "Очищено метадані релізу для checker: рушій Node.js 22, матриця GitHub Actions з Node.js 20 і 22, changelog лише в README, повні переклади news і без окремих файлів changelog у пакеті.",
         "zh-cn": "清理检查器相关的发布元数据：Node.js 22 引擎、包含 Node.js 20 和 22 的 GitHub Actions 矩阵、仅在 README 中保留 changelog、完整 news 翻译，并且包内没有单独的 changelog 文件。"
-      },
-      "0.6.11": {
-        "en": "Fixes release package metadata consistency and keeps robust scan/unload handling from 0.6.8.",
-        "de": "Korrigiert die Paket-Metadaten für den ioBroker-Check und behält die robuste Scan-/Unload-Behandlung aus 0.6.8 bei.",
-        "ru": "Обновление адаптера с улучшениями совместимости и надежности.",
-        "pt": "Atualização do adaptador com melhorias de compatibilidade e robustez.",
-        "nl": "Adapterupdate met verbeteringen voor compatibiliteit en betrouwbaarheid.",
-        "fr": "Mise à jour de l’adaptateur avec améliorations de compatibilité et de robustesse.",
-        "it": "Aggiornamento dell’adattatore con miglioramenti di compatibilità e robustezza.",
-        "es": "Actualización del adaptador con mejoras de compatibilidad y robustez.",
-        "pl": "Aktualizacja adaptera z ulepszeniami zgodności i niezawodności.",
-        "uk": "Оновлення адаптера з покращеннями сумісності та надійності.",
-        "zh-cn": "适配器更新，改进兼容性和稳定性。"
-      },
-      "0.6.10": {
-        "en": "Fixes repository checker issues from 0.6.9: removes the premature release-script dependency, fixes jsonConfig root attributes and documents old changelog linkage.",
-        "de": "Behebt Repository-Checker-Probleme aus 0.6.9: entfernt die verfrühte release-script-Abhängigkeit, korrigiert jsonConfig-Root-Attribute und dokumentiert die Verknüpfung zum alten Changelog.",
-        "ru": "Исправлены проблемы проверки репозитория из 0.6.9: удалена преждевременная зависимость release-script, исправлены корневые атрибуты jsonConfig и добавлена ссылка на старый changelog.",
-        "pt": "Corrige problemas do checker da versão 0.6.9: remove a dependência release-script prematura, corrige atributos raiz do jsonConfig e documenta o link para o changelog antigo.",
-        "nl": "Verhelpt repository-checkerproblemen uit 0.6.9: verwijdert de voortijdige release-script-afhankelijkheid, corrigeert jsonConfig-rootattributen en documenteert de link naar de oude changelog.",
-        "fr": "Corrige les problèmes du checker de la version 0.6.9 : supprime la dépendance release-script prématurée, corrige les attributs racine jsonConfig et documente le lien vers l’ancien changelog.",
-        "it": "Corregge i problemi del checker della versione 0.6.9: rimuove la dipendenza release-script prematura, corregge gli attributi root di jsonConfig e documenta il link al vecchio changelog.",
-        "es": "Corrige problemas del checker de la versión 0.6.9: elimina la dependencia release-script prematura, corrige atributos raíz de jsonConfig y documenta el enlace al changelog antiguo.",
-        "pl": "Naprawia problemy checkera z 0.6.9: usuwa przedwczesną zależność release-script, poprawia atrybuty root w jsonConfig i dokumentuje link do starego changeloga.",
-        "uk": "Виправлено проблеми перевірки репозиторію з 0.6.9: видалено передчасну залежність release-script, виправлено кореневі атрибути jsonConfig і додано посилання на старий changelog.",
-        "zh-cn": "修复 0.6.9 的仓库检查问题：移除过早添加的 release-script 依赖，修正 jsonConfig 根属性，并记录旧 changelog 链接。"
-      },
-      "0.6.9": {
-        "en": "Fixes checker compatibility: adds responsive jsonConfig sizes, documents the current release in the README changelog and keeps the robust scan/shutdown handling.",
-        "de": "Verbessert die Checker-Kompatibilität: ergänzt responsive jsonConfig-Größen, dokumentiert die aktuelle Version im README-Changelog und behält die robuste Scan-/Shutdown-Behandlung bei.",
-        "ru": "Улучшена совместимость с проверкой: добавлены адаптивные размеры jsonConfig, текущий релиз задокументирован в README changelog, сохранена надежная обработка сканирования и остановки.",
-        "pt": "Melhora a compatibilidade com o checker: adiciona tamanhos responsivos no jsonConfig, documenta a versão atual no changelog do README e mantém o tratamento robusto de varredura/desligamento.",
-        "nl": "Verbetert checker-compatibiliteit: voegt responsieve jsonConfig-afmetingen toe, documenteert de huidige release in de README-changelog en behoudt robuuste scan-/shutdown-afhandeling.",
-        "fr": "Améliore la compatibilité avec le checker : ajoute les tailles responsives jsonConfig, documente la version actuelle dans le changelog README et conserve la gestion robuste du scan/arrêt.",
-        "it": "Migliora la compatibilità con il checker: aggiunge dimensioni responsive a jsonConfig, documenta la versione corrente nel changelog README e mantiene la gestione robusta di scansione/arresto.",
-        "es": "Mejora la compatibilidad con el checker: añade tamaños responsive a jsonConfig, documenta la versión actual en el changelog del README y mantiene el manejo robusto de escaneo/apagado.",
-        "pl": "Poprawia zgodność z checkerem: dodaje responsywne rozmiary jsonConfig, dokumentuje bieżącą wersję w changelogu README i zachowuje stabilną obsługę skanowania/zamykania.",
-        "uk": "Покращено сумісність із перевіркою: додано адаптивні розміри jsonConfig, поточний реліз описано в README changelog, збережено надійну обробку сканування/завершення.",
-        "zh-cn": "改进检查器兼容性：添加响应式 jsonConfig 尺寸，在 README changelog 中记录当前版本，并保留稳健的扫描/关闭处理。"
-      },
-      "0.6.8": {
-        "en": "Adds robust Unit-ID scan handling: debug summary per checked Unit-ID, per-unit timeout/error handling, continued scans after non-responsive IDs and clean cancellation of active scans/polls during adapter unload.",
-        "de": "Ergänzt eine robuste Unit-ID-Suche: Debug-Zusammenfassung je geprüfter Unit-ID, sauberes Timeout-/Fehlerhandling pro Unit-ID, Weiterscannen nach nicht antwortenden IDs und sauberes Abbrechen laufender Scans/Polls beim Adapter-Unload.",
-        "ru": "Добавлена надежная обработка поиска Unit-ID: отладочная сводка по каждому Unit-ID, обработка тайм-аутов/ошибок, продолжение после неотвечающих ID и корректная отмена сканирования/опроса при остановке адаптера.",
-        "pt": "Adiciona varredura Unit-ID robusta: resumo de depuração por Unit-ID verificado, tratamento de timeout/erro por unidade, continuação após IDs sem resposta e cancelamento limpo de scans/polls no unload do adaptador.",
-        "nl": "Voegt robuuste Unit-ID-scan toe: debugsamenvatting per gecontroleerde Unit-ID, timeout-/foutafhandeling per unit, doorgaan na niet-reagerende IDs en nette annulering van scans/polls bij unload.",
-        "fr": "Ajoute une recherche Unit-ID robuste : résumé debug par Unit-ID, gestion des délais/erreurs par unité, poursuite après ID sans réponse et annulation propre des scans/polls à l’arrêt.",
-        "it": "Aggiunge una scansione Unit-ID robusta: riepilogo debug per Unit-ID controllato, gestione timeout/errori per unità, continuazione dopo ID non rispondenti e annullamento pulito di scansioni/poll all’unload.",
-        "es": "Añade un escaneo Unit-ID robusto: resumen debug por Unit-ID comprobado, manejo de timeout/error por unidad, continuación tras IDs sin respuesta y cancelación limpia de scans/polls al unload.",
-        "pl": "Dodaje odporne skanowanie Unit-ID: podsumowanie debug dla każdego Unit-ID, obsługa timeoutów/błędów per unit, kontynuacja po nieodpowiadających ID i czyste przerwanie skanów/polli przy unload.",
-        "uk": "Додано надійне сканування Unit-ID: debug-зведення для кожного Unit-ID, обробка тайм-аутів/помилок, продовження після ID без відповіді та чисте скасування scans/polls під час unload.",
-        "zh-cn": "新增稳健的 Unit-ID 扫描处理：每个 Unit-ID 的调试摘要、按 Unit-ID 处理超时/错误、无响应 ID 后继续扫描，并在适配器卸载时干净取消扫描/轮询。"
-      },
-      "0.6.7": {
-        "en": "Fixes a crash on successful Modbus TCP connect under Node.js 22 by correcting timer cleanup in the Modbus client.",
-        "de": "Behebt einen Absturz nach erfolgreicher Modbus-TCP-Verbindung unter Node.js 22 durch korrigierte Timer-Bereinigung im Modbus-Client.",
-        "ru": "Исправлен сбой после успешного подключения Modbus TCP в Node.js 22 за счет корректной очистки таймеров.",
-        "pt": "Corrige uma falha após conexão Modbus TCP bem-sucedida no Node.js 22 ao ajustar a limpeza dos temporizadores.",
-        "nl": "Verhelpt een crash na een succesvolle Modbus TCP-verbinding onder Node.js 22 door timeropruiming te corrigeren.",
-        "fr": "Corrige un plantage après une connexion Modbus TCP réussie sous Node.js 22 grâce à une gestion correcte des temporisateurs.",
-        "it": "Corregge un arresto dopo la connessione Modbus TCP riuscita con Node.js 22 sistemando la pulizia dei timer.",
-        "es": "Corrige un bloqueo tras una conexión Modbus TCP correcta en Node.js 22 ajustando la limpieza de temporizadores.",
-        "pl": "Naprawia awarię po udanym połączeniu Modbus TCP w Node.js 22 przez poprawienie czyszczenia timerów.",
-        "uk": "Виправлено збій після успішного підключення Modbus TCP у Node.js 22 завдяки коректному очищенню таймерів.",
-        "zh-cn": "修复了 Node.js 22 下 Modbus TCP 成功连接后因定时器清理错误导致的崩溃。"
-      },
-      "0.6.6": {
-        "en": "Clean release package without stale repository files and with corrected checker metadata.",
-        "de": "Sauberes Release-Paket ohne alte Repository-Dateien und mit korrigierten Checker-Metadaten.",
-        "ru": "Чистый релизный пакет без устаревших файлов репозитория и с исправленными метаданными проверки.",
-        "pt": "Pacote de lançamento limpo sem arquivos antigos do repositório e com metadados de verificação corrigidos.",
-        "nl": "Schone release zonder oude repositorybestanden en met gecorrigeerde checker-metadata.",
-        "fr": "Version propre sans anciens fichiers du dépôt et avec métadonnées de vérification corrigées.",
-        "it": "Pacchetto di rilascio pulito senza vecchi file repository e con metadati checker corretti.",
-        "es": "Paquete limpio sin archivos antiguos del repositorio y con metadatos de comprobación corregidos.",
-        "pl": "Czyste wydanie bez starych plików repozytorium i z poprawionymi metadanymi sprawdzania.",
-        "uk": "Чистий релізний пакет без старих файлів репозиторію та з виправленими метаданими перевірки.",
-        "zh-cn": "干净的发布包，不含旧仓库文件，并修正检查元数据。"
       }
     },
     "licenseInformation": {
@@ -186,20 +173,25 @@
     "timeout": 3000,
     "unitIdSystem": 100,
     "enableDeviceScan": true,
-    "scanFrom": 223,
-    "scanTo": 247,
     "scanInterval": 300000,
     "allowWrites": false,
     "controlUnitId": 100,
     "useNewSetpoint": true,
     "legacySetpointEnabled": false,
-    "autoCreateRawWriteObjects": true,
     "writeSafetyMinW": -30000,
     "writeSafetyMaxW": 30000,
-    "installLovelaceCard": true,
+    "installLovelaceCard": false,
     "lovelaceInstance": "lovelace.0",
-    "restartLovelaceAfterCardInstall": true,
-    "scanUnitIds": "100,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247"
+    "scanUnitIds": "100,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247",
+    "customRegisters": [],
+    "priceImport": 0.32,
+    "priceExport": 0.08,
+    "batteryCapacityKwh": 0,
+    "forecastTodayStateId": "",
+    "forecastUnit": "kWh",
+    "vrmEnabled": false,
+    "vrmSiteId": "",
+    "vrmToken": ""
   },
   "objects": [],
   "instanceObjects": [
@@ -224,5 +216,11 @@
       },
       "native": {}
     }
+  ],
+  "encryptedNative": [
+    "vrmToken"
+  ],
+  "protectedNative": [
+    "vrmToken"
   ]
 }

@@ -7,11 +7,11 @@ const { ModbusTcpClient } = require('../lib/modbusClient');
 
 describe('Modbus TCP client', () => {
     it('connects to a TCP server without crashing during timer cleanup', async () => {
-        const server = net.createServer(socket => {
+        const server = net.createServer((socket) => {
             socket.on('error', () => {});
         });
 
-        await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
         const { port } = server.address();
         const client = new ModbusTcpClient({ host: '127.0.0.1', port, timeout: 500, logger: console });
 
@@ -20,7 +20,7 @@ describe('Modbus TCP client', () => {
             assert.equal(client.connected, true);
         } finally {
             client.destroy();
-            await new Promise(resolve => server.close(resolve));
+            await new Promise((resolve) => server.close(resolve));
         }
     });
 });
