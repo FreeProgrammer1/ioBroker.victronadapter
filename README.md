@@ -210,6 +210,10 @@ yellow from `yellow_w` (300 W).
     ### **WORK IN PROGRESS**
 -->
 
+
+### **WORK IN PROGRESS**
+- (ioBroker-Bot) Adapter requires admin >= 7.8.23 now.
+
 ### 0.9.0
 
 - History import from the VRM portal (daily values of the last 400 days, updated every 3 hours); the access token is
