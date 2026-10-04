@@ -29,7 +29,7 @@
       "zh-cn": "通过 Modbus TCP 读取 Victron GX 和 Cerbo GX 系统，并提供仪表板状态、控制、发现和 Lovelace 能源卡。"
     },
     "authors": [
-      "FreeProgrammer1"
+      "FreeProgrammer1 freeprogrammer1@mail.de"
     ],
     "keywords": [
       "victron",
