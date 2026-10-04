@@ -30,7 +30,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: ["22.x", "24.x"]
+        node-version: [22.x, 24.x, 26.x]
     steps:
       - uses: ioBroker/testing-action-adapter@v1
         with:
@@ -38,7 +38,6 @@ jobs:
           os: ${{ matrix.os }}
           install-command: "npm install"
           unit-test-command: "npm run test:unit"
-          integration-test-command: "npm run test:integration"
 
   deploy:
     needs:
@@ -54,3 +53,5 @@ jobs:
         with:
           node-version: "24.x"
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Only needed for the very first npm release; afterwards switch to npm Trusted Publishing and delete the secret
+          npm-token: ${{ secrets.NPM_TOKEN }}

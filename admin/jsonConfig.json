@@ -10,6 +10,7 @@
           "type": "staticText",
           "text": "Trage nur die IP-Adresse deines Cerbo GX / Venus OS / GX-Geräts und den Modbus-TCP-Port ein. Auf dem GX-Gerät muss Modbus TCP aktiviert sein.",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -20,6 +21,7 @@
           "help": "Beispiel: 192.168.50.91 - keine Leerzeichen eingeben",
           "validator": "!!data.host && !/\\s/.test(data.host)",
           "xs": 12,
+          "sm": 6,
           "md": 6,
           "lg": 6,
           "xl": 6
@@ -30,6 +32,7 @@
           "min": 1,
           "max": 65535,
           "xs": 12,
+          "sm": 6,
           "md": 3,
           "lg": 3,
           "xl": 3
@@ -40,6 +43,7 @@
           "min": 500,
           "max": 30000,
           "xs": 12,
+          "sm": 6,
           "md": 3,
           "lg": 3,
           "xl": 3
@@ -51,6 +55,7 @@
           "min": 0,
           "max": 255,
           "xs": 12,
+          "sm": 6,
           "md": 3,
           "lg": 3,
           "xl": 3
@@ -62,12 +67,14 @@
           "min": 1000,
           "max": 600000,
           "xs": 12,
+          "sm": 6,
           "md": 3,
           "lg": 3,
           "xl": 3
         }
       },
       "xs": 12,
+      "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12
@@ -80,6 +87,7 @@
           "type": "checkbox",
           "label": "Angeschlossene Victron-Dienste automatisch suchen",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -91,6 +99,7 @@
           "validator": "!!data.scanUnitIds && /^\\s*\\d{1,3}(\\s*,\\s*\\d{1,3})*\\s*$/.test(data.scanUnitIds)",
           "hidden": "!data.enableDeviceScan",
           "xs": 12,
+          "sm": 8,
           "md": 8,
           "lg": 8,
           "xl": 8
@@ -102,6 +111,7 @@
           "max": 3600000,
           "hidden": "!data.enableDeviceScan",
           "xs": 12,
+          "sm": 6,
           "md": 4,
           "lg": 4,
           "xl": 4
@@ -110,12 +120,14 @@
           "type": "staticText",
           "text": "Hinweis: Die echten Unit-IDs siehst du am GX-Gerät unter Einstellungen → Integrationen/Services → Modbus TCP → Verfügbare Dienste. Die Suche versucht bekannte Registerbereiche automatisch zu erkennen.",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
         }
       },
       "xs": 12,
+      "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12
@@ -128,6 +140,7 @@
           "type": "staticText",
           "text": "Der Adapter summiert PV-Ertrag, Verbrauch, Netzbezug, Einspeisung, Akku und Wallbox selbst auf (statistics.*): heute, Monat, Jahr, Tagesverlauf und Historie der letzten 400 Tage. Die Werte bleiben bei einem Neustart erhalten.",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -139,6 +152,7 @@
           "max": 5,
           "step": 0.01,
           "xs": 12,
+          "sm": 6,
           "md": 4,
           "lg": 4,
           "xl": 4
@@ -150,6 +164,7 @@
           "max": 5,
           "step": 0.001,
           "xs": 12,
+          "sm": 6,
           "md": 4,
           "lg": 4,
           "xl": 4
@@ -162,6 +177,7 @@
           "max": 1000,
           "step": 0.1,
           "xs": 12,
+          "sm": 6,
           "md": 4,
           "lg": 4,
           "xl": 4
@@ -171,6 +187,7 @@
           "label": "Datenpunkt PV-Prognose heute",
           "help": "Optional, z. B. aus dem pvforecast- oder Solcast-Adapter",
           "xs": 12,
+          "sm": 8,
           "md": 8,
           "lg": 8,
           "xl": 8
@@ -189,6 +206,7 @@
             }
           ],
           "xs": 12,
+          "sm": 6,
           "md": 4,
           "lg": 4,
           "xl": 4
@@ -198,6 +216,7 @@
           "text": "Historie aus dem VRM-Portal",
           "size": 5,
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -206,6 +225,7 @@
           "type": "staticText",
           "text": "Der GX liefert über Modbus keine Historie. Mit einem VRM-Zugriffstoken importiert der Adapter die Tageswerte (PV, Verbrauch, Netz, Akku) der letzten 400 Tage aus dem VRM-Portal und aktualisiert sie alle 3 Stunden. Token erstellen: VRM-Portal → Einstellungen → Integrationen → Zugriffstoken. Die Installations-ID steht in der VRM-Adresse: vrm.victronenergy.com/installation/<ID>/…",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -214,6 +234,7 @@
           "type": "checkbox",
           "label": "Historie aus VRM importieren",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -224,6 +245,7 @@
           "hidden": "!data.vrmEnabled",
           "validator": "!data.vrmEnabled || /^\\d+$/.test(data.vrmSiteId || '')",
           "xs": 12,
+          "sm": 6,
           "md": 4,
           "lg": 4,
           "xl": 4
@@ -235,12 +257,14 @@
           "repeat": false,
           "visible": true,
           "xs": 12,
+          "sm": 8,
           "md": 8,
           "lg": 8,
           "xl": 8
         }
       },
       "xs": 12,
+      "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12
@@ -253,6 +277,7 @@
           "type": "staticText",
           "text": "Optional: Kopiert die Victron-Energieflusskarte und drei YAML-Beispiele in den Dateispeicher der Lovelace-Instanz und gibt die Dashboard-Datenpunkte für Lovelace frei. Nach dem ersten Kopieren bzw. nach einem Kartenupdate die Lovelace-Instanz einmal neu starten.",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -261,6 +286,7 @@
           "type": "checkbox",
           "label": "Lovelace-Integration aktivieren (Karte installieren und Datenpunkte freigeben)",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -271,12 +297,14 @@
           "help": "Normalerweise lovelace.0",
           "hidden": "!data.installLovelaceCard",
           "xs": 12,
+          "sm": 6,
           "md": 6,
           "lg": 6,
           "xl": 6
         }
       },
       "xs": 12,
+      "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12
@@ -289,6 +317,7 @@
           "type": "staticText",
           "text": "Schreiben ist aus Sicherheitsgründen standardmäßig deaktiviert. Ist es aktiviert, sind alle beschreibbaren Datenpunkte (controls.*, Relais unter system.*, beschreibbare Geräteregister unter devices.* und eigene Register) aktiv. Erst aktivieren, wenn du die Wirkung auf deine Anlage verstanden hast.",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -297,6 +326,7 @@
           "type": "checkbox",
           "label": "Schreib-/Steuerbefehle erlauben",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -308,6 +338,7 @@
           "min": 0,
           "max": 255,
           "xs": 12,
+          "sm": 6,
           "md": 4,
           "lg": 4,
           "xl": 4
@@ -316,6 +347,7 @@
           "type": "checkbox",
           "label": "Neuen 32-Bit Grid-Setpoint 2716/2717 verwenden",
           "xs": 12,
+          "sm": 8,
           "md": 8,
           "lg": 8,
           "xl": 8
@@ -324,6 +356,7 @@
           "type": "checkbox",
           "label": "Legacy Grid-Setpoint 2700 zusätzlich anlegen",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -334,6 +367,7 @@
           "min": -1000000,
           "max": 0,
           "xs": 12,
+          "sm": 6,
           "md": 6,
           "lg": 6,
           "xl": 6,
@@ -345,6 +379,7 @@
           "min": 0,
           "max": 1000000,
           "xs": 12,
+          "sm": 6,
           "md": 6,
           "lg": 6,
           "xl": 6,
@@ -352,6 +387,7 @@
         }
       },
       "xs": 12,
+      "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12
@@ -364,6 +400,7 @@
           "type": "staticText",
           "text": "Hier kannst du zusätzliche Victron-Register anlegen, die der Adapter nicht von selbst kennt. Sie erscheinen unter custom.unit_<Unit-ID>_reg_<Adresse>, werden bei jeder Abfrage gelesen und sind – wenn „beschreibbar“ gesetzt und Schreiben erlaubt ist – auch schreibbar. Adresse, Typ und Faktor bitte der Victron-Registerliste entnehmen. Faktor = Multiplikator nach dem Lesen (Victron-Skalierung 10 → Faktor 0.1).",
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
@@ -452,12 +489,14 @@
             }
           ],
           "xs": 12,
+          "sm": 12,
           "md": 12,
           "lg": 12,
           "xl": 12
         }
       },
       "xs": 12,
+      "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12

@@ -100,7 +100,9 @@ describe('adapter metadata', () => {
     it('tests all supported Node.js versions in the adapter-tests workflow', () => {
         const workflow = fs.readFileSync(path.join(root, '.github/workflows/test-and-release.yml'), 'utf8');
         assert.match(workflow, /adapter-tests:/);
-        assert.match(workflow, /node-version:\s*\[\s*"22\.x",\s*"24\.x"\s*\]/);
+        assert.match(workflow, /node-version:\s*\[\s*"?22\.x"?,\s*"?24\.x"?,\s*"?26\.x"?\s*\]/);
+        // the repository checker requires the default integration test command
+        assert.doesNotMatch(workflow, /integration-test-command/);
     });
 
     it('does not ship the removed raw write option anymore', () => {

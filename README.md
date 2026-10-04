@@ -210,6 +210,14 @@ yellow from `yellow_w` (300 W).
     ### **WORK IN PROGRESS**
 -->
 
+### 0.9.1
+
+- Adapter requires admin >= 7.8.23 now.
+- Updated dependencies (`@iobroker/adapter-core` 3.4.3, `@iobroker/testing` 6.3.0).
+- Adapter tests now run with Node.js 22, 24 and 26.
+- Responsive layout of the admin configuration (size attributes for all screen widths).
+- Lovelace card uses `window.setTimeout()`; author contact data added to `package.json` and `LICENSE`.
+
 ### 0.9.0
 
 - History import from the VRM portal (daily values of the last 400 days, updated every 3 hours); the access token is
@@ -293,13 +301,13 @@ yellow from `yellow_w` (300 W).
 
 - Fixed the Modbus TCP connect crash under Node.js 22 by correcting timer cleanup in the Modbus client.
 
-Older changelog entries: [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
+[Older changelogs can be found there](CHANGELOG_OLD.md)
 
 ## License
 
 MIT License
 
-Copyright (c) 2026 FreeProgrammer1
+Copyright (c) 2026 FreeProgrammer1 freeprogrammer1@mail.de
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

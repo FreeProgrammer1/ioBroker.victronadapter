@@ -635,10 +635,10 @@ class VictronAdapterModernBase extends HTMLElement {
   get hass() { return this._hass; }
   getCardSize() { return 4; }
   connectedCallback() { this._requestRender(); }
-  disconnectedCallback() { if (this._timer) clearTimeout(this._timer); this._timer = null; }
+  disconnectedCallback() { if (this._timer) window.clearTimeout(this._timer); this._timer = null; }
   _requestRender() {
     if (this._timer) return;
-    this._timer = setTimeout(() => { this._timer = null; if (this._hass) this._render(); }, 0);
+    this._timer = window.setTimeout(() => { this._timer = null; if (this._hass) this._render(); }, 0);
   }
   _render() {}
 }

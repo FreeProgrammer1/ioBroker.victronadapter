@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "victronadapter",
-    "version": "0.9.0",
+    "version": "0.9.1",
     "titleLang": {
       "en": "Victron",
       "de": "Victron",
@@ -29,7 +29,7 @@
       "zh-cn": "通过 Modbus TCP 读取 Victron GX 和 Cerbo GX 系统，并提供仪表板状态、控制、发现和 Lovelace 能源卡。"
     },
     "authors": [
-      "FreeProgrammer1"
+      "FreeProgrammer1 freeprogrammer1@mail.de"
     ],
     "keywords": [
       "victron",
@@ -64,10 +64,23 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=7.6.20"
+        "admin": ">=7.8.23"
       }
     ],
     "news": {
+      "0.9.1": {
+        "en": "Maintenance release for the ioBroker repository check: updated dependencies, tests with Node.js 22, 24 and 26, responsive admin layout, author contact data. Requires admin 7.8.23 or newer.",
+        "de": "Wartungsversion für den ioBroker-Repository-Check: Abhängigkeiten aktualisiert, Tests mit Node.js 22, 24 und 26, responsives Admin-Layout, Kontaktdaten des Autors. Benötigt Admin 7.8.23 oder neuer.",
+        "ru": "Техническая версия для проверки репозитория ioBroker: обновлены зависимости, тесты с Node.js 22, 24 и 26, адаптивный макет настроек, контактные данные автора. Требуется admin 7.8.23 или новее.",
+        "pt": "Versão de manutenção para a verificação do repositório ioBroker: dependências atualizadas, testes com Node.js 22, 24 e 26, layout responsivo do admin, dados de contacto do autor. Requer admin 7.8.23 ou superior.",
+        "nl": "Onderhoudsversie voor de ioBroker-repositorycontrole: afhankelijkheden bijgewerkt, tests met Node.js 22, 24 en 26, responsieve admin-lay-out, contactgegevens van de auteur. Vereist admin 7.8.23 of nieuwer.",
+        "fr": "Version de maintenance pour la vérification du dépôt ioBroker : dépendances mises à jour, tests avec Node.js 22, 24 et 26, mise en page admin adaptative, coordonnées de l'auteur. Nécessite admin 7.8.23 ou plus récent.",
+        "it": "Versione di manutenzione per il controllo del repository ioBroker: dipendenze aggiornate, test con Node.js 22, 24 e 26, layout admin responsivo, dati di contatto dell'autore. Richiede admin 7.8.23 o successivo.",
+        "es": "Versión de mantenimiento para la comprobación del repositorio ioBroker: dependencias actualizadas, pruebas con Node.js 22, 24 y 26, diseño adaptable del admin, datos de contacto del autor. Requiere admin 7.8.23 o posterior.",
+        "pl": "Wersja serwisowa dla kontroli repozytorium ioBroker: zaktualizowane zależności, testy z Node.js 22, 24 i 26, responsywny układ panelu admin, dane kontaktowe autora. Wymaga admin 7.8.23 lub nowszego.",
+        "uk": "Технічна версія для перевірки репозиторію ioBroker: оновлено залежності, тести з Node.js 22, 24 і 26, адаптивний макет налаштувань, контактні дані автора. Потрібен admin 7.8.23 або новіший.",
+        "zh-cn": "用于 ioBroker 仓库检查的维护版本：更新依赖、使用 Node.js 22、24 和 26 测试、响应式管理界面布局、作者联系方式。需要 admin 7.8.23 或更高版本。"
+      },
       "0.9.0": {
         "en": "History import from the Victron VRM portal: daily PV, consumption, grid and battery values of the last 400 days (the GX provides no history via Modbus). Requires a VRM access token and the installation id.",
         "de": "Historien-Import aus dem Victron-VRM-Portal: tägliche Werte für PV, Verbrauch, Netz und Akku der letzten 400 Tage (der GX liefert über Modbus keine Historie). Benötigt ein VRM-Zugriffstoken und die Installations-ID.",
@@ -97,15 +110,15 @@
       "0.8.0": {
         "en": "Energy dashboard: statistics for today/month/year (PV, consumption, grid, battery, EV), self-sufficiency, self-consumption and savings, day curve and 400-day history, alarms, battery time to full/time to go, PV forecast. 9 new Lovelace cards (today, battery, day curve, history, status, surplus traffic light, Dynamic ESS, control with confirmation, mini tile), visual card editor, German/English, extra consumers and tap details in the flow card.",
         "de": "Energie-Dashboard: Statistik für heute/Monat/Jahr (PV, Verbrauch, Netz, Akku, Wallbox), Autarkie, Eigenverbrauch und Ersparnis, Tagesverlauf und 400-Tage-Historie, Alarme, Akku voll in / Restlaufzeit, PV-Prognose. 9 neue Lovelace-Karten (Heute, Akku, Tagesverlauf, Historie, Status, Überschuss-Ampel, Dynamic ESS, Steuerung mit Sicherheitsabfrage, Mini-Kachel), grafischer Karten-Editor, Deutsch/Englisch, weitere Verbraucher und Details per Antippen in der Flusskarte.",
-        "ru": "Энергетическая панель: статистика за день/месяц/год, автономность, собственное потребление и экономия, суточный график и история за 400 дней, аварии, время до полной зарядки/разрядки аккумулятора, прогноз PV. 9 новых карт Lovelace, визуальный редактор, немецкий/английский язык.",
-        "pt": "Painel de energia: estatísticas de hoje/mês/ano, autossuficiência, autoconsumo e poupança, curva diária e histórico de 400 dias, alarmes, tempo até bateria cheia/autonomia, previsão PV. 9 novos cartões Lovelace, editor visual, alemão/inglês.",
-        "nl": "Energiedashboard: statistieken voor vandaag/maand/jaar, zelfvoorziening, eigen verbruik en besparing, dagverloop en historie van 400 dagen, alarmen, accu vol over/resterende tijd, PV-prognose. 9 nieuwe Lovelace-kaarten, visuele editor, Duits/Engels.",
-        "fr": "Tableau de bord énergie : statistiques jour/mois/année, autonomie, autoconsommation et économies, courbe journalière et historique de 400 jours, alarmes, batterie pleine dans/autonomie, prévision PV. 9 nouvelles cartes Lovelace, éditeur visuel, allemand/anglais.",
-        "it": "Dashboard energia: statistiche di oggi/mese/anno, autosufficienza, autoconsumo e risparmio, andamento giornaliero e storico di 400 giorni, allarmi, batteria piena tra/autonomia, previsione FV. 9 nuove schede Lovelace, editor visuale, tedesco/inglese.",
-        "es": "Panel de energía: estadísticas de hoy/mes/año, autosuficiencia, autoconsumo y ahorro, curva diaria e historial de 400 días, alarmas, batería llena en/autonomía, previsión FV. 9 nuevas tarjetas Lovelace, editor visual, alemán/inglés.",
-        "pl": "Panel energii: statystyki dzień/miesiąc/rok, autarkia, autokonsumpcja i oszczędności, przebieg dzienny i historia 400 dni, alarmy, akumulator pełny za/czas pracy, prognoza PV. 9 nowych kart Lovelace, edytor wizualny, niemiecki/angielski.",
-        "uk": "Енергетична панель: статистика за день/місяць/рік, автономність, власне споживання та економія, добовий графік та історія за 400 днів, аварії, час до повного заряду/розряду акумулятора, прогноз PV. 9 нових карток Lovelace, візуальний редактор, німецька/англійська.",
-        "zh-cn": "能源仪表板：今日/本月/本年统计、自给率、自用率和节省金额、日曲线和 400 天历史、告警、电池充满/剩余时间、光伏预测。9 个新的 Lovelace 卡片、可视化编辑器、德语/英语。"
+        "ru": "Энергетическая панель: статистика за сегодня/месяц/год (PV, потребление, сеть, аккумулятор, зарядная станция), автономность, собственное потребление и экономия, суточный график и история за 400 дней, аварийные сообщения, время до полной зарядки/оставшееся время работы аккумулятора, прогноз PV. 9 новых карт Lovelace (сегодня, аккумулятор, суточный график, история, статус, светофор излишков, Dynamic ESS, управление с подтверждением, мини-плитка), визуальный редактор карт, немецкий/английский язык, дополнительные потребители и подробности по нажатию в карте потоков.",
+        "pt": "Painel de energia: estatísticas de hoje/mês/ano (PV, consumo, rede, bateria, carregador VE), autossuficiência, autoconsumo e poupança, curva diária e histórico de 400 dias, alarmes, tempo até bateria cheia/autonomia restante, previsão PV. 9 novos cartões Lovelace (hoje, bateria, curva diária, histórico, estado, semáforo de excedente, Dynamic ESS, controlo com confirmação, mini mosaico), editor visual de cartões, alemão/inglês, consumidores adicionais e detalhes ao tocar no cartão de fluxo.",
+        "nl": "Energiedashboard: statistieken voor vandaag/maand/jaar (PV, verbruik, net, accu, laadpaal), zelfvoorziening, eigen verbruik en besparing, dagverloop en historie van 400 dagen, alarmen, accu vol over/resterende looptijd, PV-prognose. 9 nieuwe Lovelace-kaarten (vandaag, accu, dagverloop, historie, status, overschot-stoplicht, Dynamic ESS, bediening met bevestiging, mini-tegel), visuele kaarteditor, Duits/Engels, extra verbruikers en details door te tikken in de stroomkaart.",
+        "fr": "Tableau de bord énergie : statistiques du jour/mois/année (PV, consommation, réseau, batterie, borne de recharge), autonomie, autoconsommation et économies, courbe journalière et historique de 400 jours, alarmes, temps jusqu'à batterie pleine/autonomie restante, prévision PV. 9 nouvelles cartes Lovelace (aujourd'hui, batterie, courbe journalière, historique, état, feu de surplus, Dynamic ESS, commande avec confirmation, mini-tuile), éditeur visuel de cartes, allemand/anglais, consommateurs supplémentaires et détails au toucher dans la carte de flux.",
+        "it": "Dashboard energia: statistiche di oggi/mese/anno (FV, consumo, rete, batteria, wallbox), autosufficienza, autoconsumo e risparmio, andamento giornaliero e storico di 400 giorni, allarmi, tempo alla carica completa/autonomia residua della batteria, previsione FV. 9 nuove schede Lovelace (oggi, batteria, andamento giornaliero, storico, stato, semaforo eccedenza, Dynamic ESS, comando con conferma, mini riquadro), editor visuale delle schede, tedesco/inglese, utenze aggiuntive e dettagli al tocco nella scheda dei flussi.",
+        "es": "Panel de energía: estadísticas de hoy/mes/año (FV, consumo, red, batería, cargador VE), autosuficiencia, autoconsumo y ahorro, curva diaria e historial de 400 días, alarmas, tiempo hasta batería llena/autonomía restante, previsión FV. 9 nuevas tarjetas Lovelace (hoy, batería, curva diaria, historial, estado, semáforo de excedente, Dynamic ESS, control con confirmación, mini mosaico), editor visual de tarjetas, alemán/inglés, consumidores adicionales y detalles al tocar en la tarjeta de flujo.",
+        "pl": "Panel energii: statystyki za dziś/miesiąc/rok (PV, zużycie, sieć, akumulator, ładowarka EV), autarkia, autokonsumpcja i oszczędności, przebieg dzienny i historia 400 dni, alarmy, czas do pełnego naładowania/pozostały czas pracy akumulatora, prognoza PV. 9 nowych kart Lovelace (dziś, akumulator, przebieg dzienny, historia, status, sygnalizator nadwyżki, Dynamic ESS, sterowanie z potwierdzeniem, mini kafelek), wizualny edytor kart, niemiecki/angielski, dodatkowe odbiorniki i szczegóły po dotknięciu w karcie przepływów.",
+        "uk": "Енергетична панель: статистика за сьогодні/місяць/рік (PV, споживання, мережа, акумулятор, зарядна станція), автономність, власне споживання та економія, добовий графік та історія за 400 днів, аварійні повідомлення, час до повного заряду/залишковий час роботи акумулятора, прогноз PV. 9 нових карток Lovelace (сьогодні, акумулятор, добовий графік, історія, статус, світлофор надлишку, Dynamic ESS, керування з підтвердженням, міні-плитка), візуальний редактор карток, німецька/англійська, додаткові споживачі та деталі за натисканням у картці потоків.",
+        "zh-cn": "能源仪表板：今日/本月/本年统计（光伏、用电、电网、电池、充电桩）、自给率、自用率和节省金额、日曲线和 400 天历史、告警、电池充满时间/剩余运行时间、光伏预测。9 个新的 Lovelace 卡片（今日、电池、日曲线、历史、状态、余电信号灯、Dynamic ESS、带确认的控制、迷你磁贴）、可视化卡片编辑器、德语/英语、能量流卡片中的更多用电设备和点按详情。"
       },
       "0.7.1": {
         "en": "New Lovelace card \"custom:victronadapter-flow-hub\": PV, house, grid, EV charger and battery around a central hub with progress rings and animated energy flow. New state dashboard.ev_power.",
@@ -145,19 +158,6 @@
         "pl": "Poprawia metadane workflow GitHub i dodaje zgodny ze sprawdzaniem link do starego changeloga, zachowując metadane środowiska Node.js 22.",
         "uk": "Виправлено метадані робочого процесу GitHub і додано сумісне з перевіркою посилання на старий журнал змін зі збереженням метаданих Node.js 22.",
         "zh-cn": "修复 GitHub 工作流元数据，并添加兼容检查器的旧变更日志链接，同时保留 Node.js 22 运行时元数据。"
-      },
-      "0.6.12": {
-        "en": "Cleans checker-relevant release metadata: Node.js 22 engine, GitHub Actions matrix with Node.js 20 and 22, README-only changelog, complete news translations and no standalone changelog files in the package.",
-        "de": "Bereinigt checkerrelevante Release-Metadaten: Node.js-22-Engine, GitHub-Actions-Matrix mit Node.js 20 und 22, Changelog nur in der README, vollständige News-Übersetzungen und keine separaten Changelog-Dateien im Paket.",
-        "ru": "Очищены метаданные релиза для проверки: движок Node.js 22, матрица GitHub Actions с Node.js 20 и 22, changelog только в README, полные переводы news и без отдельных файлов changelog в пакете.",
-        "pt": "Limpa metadados de release relevantes para o checker: engine Node.js 22, matriz GitHub Actions com Node.js 20 e 22, changelog apenas no README, traduções completas de news e sem arquivos changelog separados no pacote.",
-        "nl": "Schoont release-metadata voor de checker op: Node.js 22-engine, GitHub Actions-matrix met Node.js 20 en 22, changelog alleen in README, volledige news-vertalingen en geen losse changelogbestanden in het pakket.",
-        "fr": "Nettoie les métadonnées de version pour le checker : moteur Node.js 22, matrice GitHub Actions avec Node.js 20 et 22, changelog uniquement dans README, traductions news complètes et aucun fichier changelog séparé dans le paquet.",
-        "it": "Ripulisce i metadati di rilascio rilevanti per il checker: engine Node.js 22, matrice GitHub Actions con Node.js 20 e 22, changelog solo nel README, traduzioni news complete e nessun file changelog separato nel pacchetto.",
-        "es": "Limpia los metadatos de lanzamiento relevantes para el checker: motor Node.js 22, matriz de GitHub Actions con Node.js 20 y 22, changelog solo en README, traducciones completas de news y sin archivos changelog separados en el paquete.",
-        "pl": "Czyści metadane wydania istotne dla checkera: silnik Node.js 22, macierz GitHub Actions z Node.js 20 i 22, changelog tylko w README, pełne tłumaczenia news i brak osobnych plików changelog w paczce.",
-        "uk": "Очищено метадані релізу для checker: рушій Node.js 22, матриця GitHub Actions з Node.js 20 і 22, changelog лише в README, повні переклади news і без окремих файлів changelog у пакеті.",
-        "zh-cn": "清理检查器相关的发布元数据：Node.js 22 引擎、包含 Node.js 20 和 22 的 GitHub Actions 矩阵、仅在 README 中保留 changelog、完整 news 翻译，并且包内没有单独的 changelog 文件。"
       }
     },
     "licenseInformation": {
